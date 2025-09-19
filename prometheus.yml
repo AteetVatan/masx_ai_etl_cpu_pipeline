@@ -1,0 +1,83 @@
+# Prometheus configuration for MASX AI ETL CPU Pipeline monitoring
+# Collects metrics from the application and system components
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # MASX ETL Pipeline application
+  - job_name: 'masx-etl-pipeline'
+    static_configs:
+      - targets: ['masx-etl-pipeline:8000']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+    scrape_timeout: 10s
+
+  # Redis metrics (if redis_exporter is available)
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+    scrape_interval: 30s
+
+  # PostgreSQL metrics (if postgres_exporter is available)
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres:5432']
+    scrape_interval: 30s
+
+  # Node exporter for system metrics (if available)
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 30s
+
+  # Nginx metrics (if nginx-prometheus-exporter is available)
+  - job_name: 'nginx'
+    static_configs:
+      - targets: ['nginx:9113']
+    scrape_interval: 30s
+
+# Alerting rules (uncomment and configure as needed)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets:
+#           - alertmanager:9093
+
+# Recording rules for common queries
+recording_rules:
+  - name: masx_etl_pipeline
+    rules:
+      # CPU usage percentage
+      - record: masx_etl_pipeline:cpu_usage_percent
+        expr: 100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
+      
+      # Memory usage percentage
+      - record: masx_etl_pipeline:memory_usage_percent
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100
+      
+      # Disk usage percentage
+      - record: masx_etl_pipeline:disk_usage_percent
+        expr: (1 - (node_filesystem_avail_bytes / node_filesystem_size_bytes)) * 100
+      
+      # Request rate
+      - record: masx_etl_pipeline:request_rate
+        expr: rate(http_requests_total[5m])
+      
+      # Error rate
+      - record: masx_etl_pipeline:error_rate
+        expr: rate(http_requests_total{status=~"5.."}[5m])
+      
+      # Response time
+      - record: masx_etl_pipeline:response_time_p95
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))
