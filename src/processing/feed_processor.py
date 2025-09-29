@@ -8,13 +8,16 @@ comprehensive pipeline orchestration and batch operations.
 import asyncio
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
-import logging
 
-from ..db.db_client import db_client, DatabaseError
+
+from src.db import db_connection, DatabaseError
 from ..pipeline.pipeline_manager import pipeline_manager
+from src.models import FeedModel
+from src.config import get_service_logger
+from src.utils import validate_and_raise
 
+logger = get_service_logger(__name__)
 
-logger = logging.getLogger(__name__)
 
 
 class FeedProcessor:
@@ -35,35 +38,47 @@ class FeedProcessor:
             "failed": 0,
             "last_processed_date": None
         }
+        self.date = datetime.now().strftime("%Y-%m-%d")        
+        db_connection.date = self.date
         
         logger.info("Feed processor initialized")
+        
+    def set_date(self, date: str):
+        validated_date = validate_and_raise(date, "date")
+        db_connection.date = validated_date
+        self.date = validated_date        
     
-    async def warm_up_server(self, date: str) -> Dict[str, Any]:
+    async def warm_up_server(self) -> Dict[str, Any]:
         """
         Warm up the server by loading feed entries for a specific date.
         
         Args:
-            date: Date in YYYYMMDD format (e.g., "20250702")
+            date: Date in YYYY-MM-DD format (e.g., "2025-07-02")
             
         Returns:
             Dictionary containing warm-up results
+            
+        Raises:
+            ValueError: If date format is invalid
         """
+         
+        
         try:
-            logger.info(f"Warming up server for date: {date}")
+            logger.info(f"Warming up server for date: {self.date}")
             
             # Load feed entries for the date
-            feed_entries = await self._load_feed_entries(date)
+            feed_entries = await self._load_feed_entries()
             
             # Store in global variable
-            self.all_feed_entries[date] = feed_entries
+            self.all_feed_entries[self.date] = feed_entries
             self.processing_stats["total_loaded"] = len(feed_entries)
-            self.processing_stats["last_processed_date"] = date
+            self.processing_stats["last_processed_date"] = self.date
             
             return {
                 "status": "warmed_up",
-                "date": date,
+                "date": self.date,
                 "total_entries": len(feed_entries),
-                "message": f"Server warmed up with {len(feed_entries)} feed entries for date {date}",
+                "message": f"Server warmed up with {len(feed_entries)} feed entries for date {self.date}",
                 "timestamp": datetime.utcnow().isoformat()
             }
             
@@ -71,66 +86,73 @@ class FeedProcessor:
             logger.error(f"Database error during warm-up: {e}")
             return {
                 "status": "error",
-                "date": date,
+                "date": self.date,
                 "error": str(e),
-                "message": f"Table feed_entries_{date} not available",
+                "message": f"Table feed_entries_{self.date} not available",
                 "timestamp": datetime.utcnow().isoformat()
             }
         except Exception as e:
             logger.error(f"Unexpected error during warm-up: {e}")
             return {
                 "status": "error",
-                "date": date,
+                "date": self.date,
                 "error": str(e),
                 "message": "Unexpected error during warm-up",
                 "timestamp": datetime.utcnow().isoformat()
             }
     
-    async def process_feed_entries_by_date(self, date: str) -> Dict[str, Any]:
+    async def process_feed_entries(self) -> Dict[str, Any]:
         """
         Process all feed entries for a specific date.
         
         Args:
-            date: Date in YYYYMMDD format (e.g., "20250702")
+            date: Date in YYYY-MM-DD format (e.g., "2025-07-02")
             
         Returns:
             Dictionary containing processing results
+            
+        Raises:
+            ValueError: If date format is invalid
         """
+       
+        
         try:
-            logger.info(f"Processing feed entries for date: {date}")
+
+            
+            logger.info(f"Processing feed entries for date: {self.date}")
             
             # Load feed entries if not already loaded
-            if date not in self.all_feed_entries:
-                feed_entries = await self._load_feed_entries(date)
-                self.all_feed_entries[date] = feed_entries
+            if self.date not in self.all_feed_entries:
+                feed_entries = await self._load_feed_entries()
+                self.all_feed_entries[self.date] = feed_entries
             else:
-                feed_entries = self.all_feed_entries[date]
+                feed_entries = self.all_feed_entries[self.date]
             
             if not feed_entries:
                 return {
                     "status": "no_entries",
-                    "date": date,
-                    "message": f"No feed entries found for date {date}",
+                    "date": self.date,
+                    "message": f"No feed entries found for date {self.date}",
                     "timestamp": datetime.utcnow().isoformat()
                 }
             
             # Process all entries
-            results = await self._process_feed_entries(feed_entries, date)
+            results = await self._process_feed_entries(feed_entries)
             
             # Update statistics
             self.processing_stats["total_processed"] += len(feed_entries)
             self.processing_stats["successful"] += results["successful"]
             self.processing_stats["failed"] += results["failed"]
-            self.processing_stats["last_processed_date"] = date
+            self.processing_stats["last_processed_date"] = self.date
             
             return {
                 "status": "completed",
-                "date": date,
+                "date": self.date,
                 "total_entries": len(feed_entries),
                 "successful": results["successful"],
                 "failed": results["failed"],
                 "processing_time": results["processing_time"],
-                "message": f"Processed {len(feed_entries)} feed entries for date {date}",
+                "message": f"Processed {len(feed_entries)} feed entries for date {self.date}",
                 "timestamp": datetime.utcnow().isoformat()
             }
             
@@ -138,65 +160,69 @@ class FeedProcessor:
             logger.error(f"Database error during processing: {e}")
             return {
                 "status": "error",
-                "date": date,
+                "date": self.date,
                 "error": str(e),
-                "message": f"Table feed_entries_{date} not available",
+                "message": f"Table feed_entries_{self.date} not available",
                 "timestamp": datetime.utcnow().isoformat()
             }
         except Exception as e:
             logger.error(f"Unexpected error during processing: {e}")
             return {
                 "status": "error",
-                "date": date,
+                "date": self.date,
                 "error": str(e),
                 "message": "Unexpected error during processing",
                 "timestamp": datetime.utcnow().isoformat()
             }
     
-    async def process_feed_entries_by_flashpoint_id(self, date: str, flashpoint_id: str) -> Dict[str, Any]:
+    async def process_feed_entries_by_flashpoint_id(self, flashpoint_id: str) -> Dict[str, Any]:
         """
         Process feed entries for a specific date and flashpoint_id.
         
         Args:
-            date: Date in YYYYMMDD format (e.g., "20250702")
+            date: Date in YYYY-MM-DD format (e.g., "2025-07-02")
             flashpoint_id: Flashpoint ID to filter by
             
         Returns:
             Dictionary containing processing results
-        """
+            
+        Raises:
+            ValueError: If date format is invalid
+        """     
+        
         try:
-            logger.info(f"Processing feed entries for date: {date}, flashpoint_id: {flashpoint_id}")
+            logger.info(f"Processing feed entries for date: {self.date}, flashpoint_id: {flashpoint_id}")
             
             # Load feed entries filtered by flashpoint_id
-            feed_entries = await self._load_feed_entries_by_flashpoint_id(date, flashpoint_id)
+            feed_entries = await self._load_feed_entries_by_flashpoint_id(flashpoint_id)
             
             if not feed_entries:
                 return {
                     "status": "no_entries",
-                    "date": date,
+                    "date": self.date,
                     "flashpoint_id": flashpoint_id,
-                    "message": f"No feed entries found for date {date} and flashpoint_id {flashpoint_id}",
+                    "message": f"No feed entries found for date {self.date} and flashpoint_id {flashpoint_id}",
                     "timestamp": datetime.utcnow().isoformat()
                 }
             
             # Process filtered entries
-            results = await self._process_feed_entries(feed_entries, date)
+            results = await self._process_feed_entries(feed_entries)
             
             # Update statistics
             self.processing_stats["total_processed"] += len(feed_entries)
             self.processing_stats["successful"] += results["successful"]
             self.processing_stats["failed"] += results["failed"]
-            self.processing_stats["last_processed_date"] = date
+            self.processing_stats["last_processed_date"] = self.date
             
             return {
                 "status": "completed",
-                "date": date,
+                "date": self.date,
                 "flashpoint_id": flashpoint_id,
                 "total_entries": len(feed_entries),
                 "successful": results["successful"],
                 "failed": results["failed"],
                 "processing_time": results["processing_time"],
-                "message": f"Processed {len(feed_entries)} feed entries for date {date} and flashpoint_id {flashpoint_id}",
+                "message": f"Processed {len(feed_entries)} feed entries for date {self.date} and flashpoint_id {flashpoint_id}",
                 "timestamp": datetime.utcnow().isoformat()
             }
             
@@ -204,32 +230,32 @@ class FeedProcessor:
             logger.error(f"Database error during processing: {e}")
             return {
                 "status": "error",
-                "date": date,
+                "date": self.date,
                 "flashpoint_id": flashpoint_id,
                 "error": str(e),
-                "message": f"Table feed_entries_{date} not available",
+                "message": f"Table feed_entries_{self.date} not available",
                 "timestamp": datetime.utcnow().isoformat()
             }
         except Exception as e:
             logger.error(f"Unexpected error during processing: {e}")
             return {
                 "status": "error",
-                "date": date,
+                "date": self.date,
                 "flashpoint_id": flashpoint_id,
                 "error": str(e),
                 "message": "Unexpected error during processing",
                 "timestamp": datetime.utcnow().isoformat()
             }
     
-    async def _load_feed_entries(self, date: str) -> List[Dict[str, Any]]:
+    async def _load_feed_entries(self) -> List[Dict[str, Any]]:
         """Load feed entries for a specific date."""
-        return await db_client.fetch_feed_entries_by_date(date)
+        return await db_connection.fetch_feed_entries()
     
-    async def _load_feed_entries_by_flashpoint_id(self, date: str, flashpoint_id: str) -> List[Dict[str, Any]]:
+    async def _load_feed_entries_by_flashpoint_id(self, flashpoint_id: str) -> List[Dict[str, Any]]:
         """Load feed entries for a specific date and flashpoint_id."""
-        return await db_client.fetch_feed_entries_by_flashpoint_id(date, flashpoint_id)
+        return await db_connection.fetch_feed_entries_by_flashpoint_id(flashpoint_id)
     
-    async def _process_feed_entries(self, feed_entries: List[Dict[str, Any]], date: str) -> Dict[str, Any]:
+    async def _process_feed_entries(self, feed_entries: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Process a list of feed entries through the pipeline."""
         start_time = datetime.utcnow()
         successful = 0
@@ -238,14 +264,15 @@ class FeedProcessor:
         for feed_entry in feed_entries:
             try:
                 # Convert feed entry to article format for processing
-                article_data = self._convert_feed_entry_to_article(feed_entry)
+                article_data: FeedModel = FeedModel.from_feed_entry(feed_entry)
                 
                 # Process through pipeline
-                result = await pipeline_manager.process_article(article_data)
+                result = await pipeline_manager.process_article(article_data, self.date)
                 
                 if result["status"] == "completed":
                     # Save processed article to database
-                    save_success = await db_client.save_processed_article(feed_entry, result["enriched_data"])
+                    enriched_data: FeedModel = result["enriched_data"]
+                    save_success = await db_connection.update_processed_article(enriched_data)
                     
                     if save_success:
                         successful += 1
@@ -267,27 +294,8 @@ class FeedProcessor:
             "successful": successful,
             "failed": failed,
             "processing_time": processing_time
-        }
-    
-    def _convert_feed_entry_to_article(self, feed_entry: Dict[str, Any]) -> Dict[str, Any]:
-        """Convert feed entry to article format for processing."""
-        return {
-            "id": feed_entry.get("id"),
-            "url": feed_entry.get("url"),
-            "title": feed_entry.get("title"),
-            "content": feed_entry.get("description", ""),
-            "author": "",  # Not available in feed entry
-            "published_date": feed_entry.get("seendate"),
-            "metadata": {
-                "flashpoint_id": feed_entry.get("flashpoint_id"),
-                "domain": feed_entry.get("domain"),
-                "language": feed_entry.get("language"),
-                "source_country": feed_entry.get("sourcecountry"),
-                "original_image": feed_entry.get("image"),
-                "feed_entry_id": feed_entry.get("id")
-            }
-        }
-    
+        }    
+
     def get_processing_stats(self) -> Dict[str, Any]:
         """Get processing statistics."""
         return {
@@ -296,16 +304,36 @@ class FeedProcessor:
             "total_loaded_entries": sum(len(entries) for entries in self.all_feed_entries.values())
         }
     
-    def get_feed_entries_for_date(self, date: str) -> List[Dict[str, Any]]:
-        """Get loaded feed entries for a specific date."""
-        return self.all_feed_entries.get(date, [])
+    def get_feed_entries(self) -> List[Dict[str, Any]]:
+        """
+        Get loaded feed entries.  
+            
+        Returns:
+            List of feed entries for the specified date
+            
+        Raises:
+            ValueError: If date format is invalid
+        """
+        # Validate date format
+     
+        return self.all_feed_entries.get(self.date, [])
     
     def clear_feed_entries(self, date: str = None):
-        """Clear feed entries from memory."""
+        """
+        Clear feed entries from memory.
+        
+        Args:
+            date: Date in YYYY-MM-DD format (e.g., "2025-07-02"). If None, clears all entries.
+            
+        Raises:
+            ValueError: If date format is invalid
+        """
         if date:
-            if date in self.all_feed_entries:
-                del self.all_feed_entries[date]
-                logger.info(f"Cleared feed entries for date: {date}")
+            # Validate date format
+            validated_date = validate_and_raise(date, "date")
+            if validated_date in self.all_feed_entries:
+                del self.all_feed_entries[validated_date]
+                logger.info(f"Cleared feed entries for date: {validated_date}")
         else:
             self.all_feed_entries.clear()
             logger.info("Cleared all feed entries")

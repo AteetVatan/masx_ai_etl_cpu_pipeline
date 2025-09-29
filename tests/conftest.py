@@ -10,8 +10,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from typing import Dict, Any, List
 
 from src.config.settings import Settings
-from src.db.db_client import DatabaseClient
-from src.scraping.scraper import ArticleScraper
+from src.db.db_client_and_pool import DatabaseClientAndPool
+from src.scraping.scraper import BeautifulSoupExtractor
 from src.processing.cleaner import TextCleaner
 from src.processing.geotagger import Geotagger
 from src.processing.image_finder import ImageFinder
@@ -24,8 +24,8 @@ def test_settings():
     """Test settings configuration."""
     return Settings(
         supabase_url="https://test.supabase.co",
-        supabase_key="test_key",
-        supabase_service_key="test_service_key",
+        supabase_anon_key="test_key",
+        supabase_service_role_key="test_service_key",
         db_host="localhost",
         db_name="test_db",
         db_user="test_user",
@@ -45,7 +45,7 @@ def test_settings():
 @pytest.fixture
 def mock_db_client():
     """Mock database client for testing."""
-    client = AsyncMock(spec=DatabaseClient)
+    client = AsyncMock(spec=DatabaseClientAndPool)
     client.client = AsyncMock()
     client.connect = AsyncMock()
     client.disconnect = AsyncMock()
@@ -60,7 +60,7 @@ def mock_db_client():
 @pytest.fixture
 def mock_scraper():
     """Mock article scraper for testing."""
-    scraper = AsyncMock(spec=ArticleScraper)
+    scraper = AsyncMock(spec=BeautifulSoupExtractor)
     scraper.scrape_article = AsyncMock(return_value={
         "url": "https://example.com/article",
         "title": "Test Article",

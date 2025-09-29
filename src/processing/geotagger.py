@@ -1,496 +1,260 @@
 """
 Geotagging module for MASX AI ETL CPU Pipeline.
 
-Uses multilingual NER and pycountry for accurate geographic entity recognition
-and normalization across multiple languages.
+Uses CountryTagger (Aho–Corasick over GeoNames aliases) for multilingual COUNTRY detection.
+City extraction is BONUS ONLY (via countrytagger.tag_place) and is OFF by default.
+
+Designed for very long texts (500–100,000+ tokens) on CPU.
+
+Entry point: extract_geographic_entities(text: str) -> dict
 """
 
-import re
-from typing import List, Dict, Any, Optional, Tuple
-import logging
+from __future__ import annotations
+from typing import Dict, Any, List, Iterable
+from collections import OrderedDict, defaultdict
 
-try:
-    import spacy
-    from spacy import displacy
-    SPACY_AVAILABLE = True
-except ImportError:
-    SPACY_AVAILABLE = False
-
-try:
-    import pycountry
-    PYCOUNTRY_AVAILABLE = True
-except ImportError:
-    PYCOUNTRY_AVAILABLE = False
-
-from ..config.settings import settings
-
-
-logger = logging.getLogger(__name__)
+import countrytagger  # <-- module with tag_text_countries / tag_place
+import pycountry
+from src.models import GeoEntity, EntityAttributes
+from src.config import get_settings, get_service_logger
 
 
 class Geotagger:
     """
-    Multilingual geotagging system using spaCy NER and pycountry.
-    
-    Identifies and normalizes geographic entities in text across multiple
-    languages with high accuracy and confidence scoring.
+    Multilingual geotagging using CountryTagger (module-level API only).
+    - Country = must (multilingual aliases via GeoNames alternate names)
+    - City = bonus (available only via explicit tag_place calls; OFF by default)
+    - CPU-only; scalable to 100k+ tokens with paragraph-aware chunking
     """
-    
-    def __init__(self):
-        """Initialize the geotagger with language models."""
-        self.enabled = settings.enable_geotagging
-        self.models = {}
-        self.country_mappings = {}
-        self.city_mappings = {}
+
+    def __init__(self, chunk_chars: int = 20_000) -> None:
+        self.settings = get_settings()
+        self.logger = get_service_logger("Geotagger")
+        self.enabled = getattr(self.settings, "enable_geotagging", True)
+        # never let chunk size be too small; large-enough windows reduce overhead and cross-boundary splits
+        self.chunk_chars = max(5_000, int(chunk_chars))
         
-        if not SPACY_AVAILABLE:
-            logger.warning("spaCy not available - geotagging disabled")
-            self.enabled = False
-            return
-        
-        if not PYCOUNTRY_AVAILABLE:
-            logger.warning("pycountry not available - geotagging disabled")
-            self.enabled = False
-            return
-        
-        # Initialize country and city mappings
-        self._initialize_mappings()
-        
-        # Load language models
-        self._load_models()
-        
-        logger.info("Geotagger initialized with multilingual support")
-    
-    def _initialize_mappings(self):
-        """Initialize country and city mappings for normalization."""
-        # Country mappings (common variations to ISO codes)
-        self.country_mappings = {
-            # English variations
-            "united states": "US", "usa": "US", "america": "US",
-            "united kingdom": "GB", "uk": "GB", "britain": "GB",
-            "russia": "RU", "russian federation": "RU",
-            "china": "CN", "people's republic of china": "CN",
-            "germany": "DE", "deutschland": "DE",
-            "france": "FR", "french republic": "FR",
-            "spain": "ES", "spain": "ES", "españa": "ES",
-            "italy": "IT", "italia": "IT",
-            "japan": "JP", "nippon": "JP",
-            "south korea": "KR", "korea": "KR",
-            "north korea": "KP", "dprk": "KP",
-            "ukraine": "UA", "ukraina": "UA",
-            "poland": "PL", "polska": "PL",
-            "canada": "CA", "canada": "CA",
-            "australia": "AU", "australia": "AU",
-            "brazil": "BR", "brasil": "BR",
-            "india": "IN", "bharat": "IN",
-            "mexico": "MX", "méxico": "MX",
-            "argentina": "AR", "argentina": "AR",
-            "south africa": "ZA", "zuid-afrika": "ZA",
-            "egypt": "EG", "misr": "EG",
-            "turkey": "TR", "türkiye": "TR",
-            "iran": "IR", "islamic republic of iran": "IR",
-            "iraq": "IQ", "iraq": "IQ",
-            "syria": "SY", "syrian arab republic": "SY",
-            "israel": "IL", "israel": "IL",
-            "palestine": "PS", "palestinian territories": "PS",
-            "saudi arabia": "SA", "kingdom of saudi arabia": "SA",
-            "uae": "AE", "united arab emirates": "AE",
-            "qatar": "QA", "qatar": "QA",
-            "kuwait": "KW", "kuwait": "KW",
-            "bahrain": "BH", "bahrain": "BH",
-            "oman": "OM", "sultanate of oman": "OM",
-            "yemen": "YE", "yemen republic": "YE",
-            "lebanon": "LB", "lebanese republic": "LB",
-            "jordan": "JO", "hashemite kingdom of jordan": "JO",
-            "cyprus": "CY", "cyprus republic": "CY",
-            "greece": "GR", "hellenic republic": "GR",
-            "bulgaria": "BG", "republic of bulgaria": "BG",
-            "romania": "RO", "românia": "RO",
-            "hungary": "HU", "magyarország": "HU",
-            "czech republic": "CZ", "czechia": "CZ",
-            "slovakia": "SK", "slovak republic": "SK",
-            "slovenia": "SI", "republic of slovenia": "SI",
-            "croatia": "HR", "republic of croatia": "HR",
-            "bosnia and herzegovina": "BA", "bosnia": "BA",
-            "serbia": "RS", "republic of serbia": "RS",
-            "montenegro": "ME", "montenegro": "ME",
-            "albania": "AL", "republic of albania": "AL",
-            "north macedonia": "MK", "macedonia": "MK",
-            "kosovo": "XK", "republic of kosovo": "XK",
-            "moldova": "MD", "republic of moldova": "MD",
-            "belarus": "BY", "republic of belarus": "BY",
-            "lithuania": "LT", "republic of lithuania": "LT",
-            "latvia": "LV", "republic of latvia": "LV",
-            "estonia": "EE", "republic of estonia": "EE",
-            "finland": "FI", "finnish republic": "FI",
-            "sweden": "SE", "kingdom of sweden": "SE",
-            "norway": "NO", "kingdom of norway": "NO",
-            "denmark": "DK", "kingdom of denmark": "DK",
-            "iceland": "IS", "republic of iceland": "IS",
-            "ireland": "IE", "republic of ireland": "IE",
-            "portugal": "PT", "portuguese republic": "PT",
-            "switzerland": "CH", "swiss confederation": "CH",
-            "austria": "AT", "republic of austria": "AT",
-            "belgium": "BE", "kingdom of belgium": "BE",
-            "netherlands": "NL", "kingdom of the netherlands": "NL",
-            "luxembourg": "LU", "grand duchy of luxembourg": "LU",
-            "monaco": "MC", "principality of monaco": "MC",
-            "liechtenstein": "LI", "principality of liechtenstein": "LI",
-            "san marino": "SM", "republic of san marino": "SM",
-            "vatican": "VA", "vatican city": "VA",
-            "malta": "MT", "republic of malta": "MT",
-            "andorra": "AD", "principality of andorra": "AD",
-        }
-        
-        # City mappings (common variations to standardized names)
-        self.city_mappings = {
-            # Major cities
-            "new york": "New York",
-            "new york city": "New York",
-            "nyc": "New York",
-            "london": "London",
-            "paris": "Paris",
-            "berlin": "Berlin",
-            "madrid": "Madrid",
-            "rome": "Rome",
-            "moscow": "Moscow",
-            "tokyo": "Tokyo",
-            "beijing": "Beijing",
-            "peking": "Beijing",
-            "shanghai": "Shanghai",
-            "hong kong": "Hong Kong",
-            "singapore": "Singapore",
-            "sydney": "Sydney",
-            "melbourne": "Melbourne",
-            "toronto": "Toronto",
-            "vancouver": "Vancouver",
-            "mexico city": "Mexico City",
-            "são paulo": "São Paulo",
-            "sao paulo": "São Paulo",
-            "buenos aires": "Buenos Aires",
-            "cairo": "Cairo",
-            "istanbul": "Istanbul",
-            "constantinople": "Istanbul",
-            "tehran": "Tehran",
-            "baghdad": "Baghdad",
-            "damascus": "Damascus",
-            "jerusalem": "Jerusalem",
-            "tel aviv": "Tel Aviv",
-            "riyadh": "Riyadh",
-            "dubai": "Dubai",
-            "doha": "Doha",
-            "kuwait city": "Kuwait City",
-            "manama": "Manama",
-            "muscat": "Muscat",
-            "sanaa": "Sana'a",
-            "beirut": "Beirut",
-            "amman": "Amman",
-            "nicosia": "Nicosia",
-            "athens": "Athens",
-            "sofia": "Sofia",
-            "bucharest": "Bucharest",
-            "budapest": "Budapest",
-            "prague": "Prague",
-            "bratislava": "Bratislava",
-            "ljubljana": "Ljubljana",
-            "zagreb": "Zagreb",
-            "sarajevo": "Sarajevo",
-            "belgrade": "Belgrade",
-            "podgorica": "Podgorica",
-            "tirana": "Tirana",
-            "skopje": "Skopje",
-            "pristina": "Pristina",
-            "chisinau": "Chișinău",
-            "minsk": "Minsk",
-            "vilnius": "Vilnius",
-            "riga": "Riga",
-            "tallinn": "Tallinn",
-            "helsinki": "Helsinki",
-            "stockholm": "Stockholm",
-            "oslo": "Oslo",
-            "copenhagen": "Copenhagen",
-            "reykjavik": "Reykjavik",
-            "dublin": "Dublin",
-            "lisbon": "Lisbon",
-            "bern": "Bern",
-            "vienna": "Vienna",
-            "brussels": "Brussels",
-            "amsterdam": "Amsterdam",
-            "luxembourg city": "Luxembourg",
-            "monaco": "Monaco",
-            "vaduz": "Vaduz",
-            "san marino": "San Marino",
-            "vatican city": "Vatican City",
-            "valletta": "Valletta",
-            "andorra la vella": "Andorra la Vella",
-        }
-    
-    def _load_models(self):
-        """Load spaCy language models."""
-        # Language models to load
-        language_models = {
-            "en": "en_core_web_sm",
-            "es": "es_core_news_sm",
-            "fr": "fr_core_news_sm",
-            "de": "de_core_news_sm",
-            "it": "it_core_news_sm",
-            "pt": "pt_core_news_sm",
-            "ru": "ru_core_news_sm",
-            "zh": "zh_core_web_sm",
-            "ja": "ja_core_news_sm",
-            "ar": "ar_core_news_sm",
-        }
-        
-        for lang, model_name in language_models.items():
-            try:
-                self.models[lang] = spacy.load(model_name)
-                logger.info(f"Loaded {model_name} model for {lang}")
-            except OSError:
-                logger.warning(f"Could not load {model_name} model for {lang}")
-                # Try to download the model
-                try:
-                    spacy.cli.download(model_name)
-                    self.models[lang] = spacy.load(model_name)
-                    logger.info(f"Downloaded and loaded {model_name} model for {lang}")
-                except Exception as e:
-                    logger.error(f"Failed to download {model_name} model for {lang}: {e}")
-    
-    def extract_geographic_entities(self, text: str, language: str = "en") -> Dict[str, Any]:
+
+
+
+        # CountryTagger builds/loads its Aho–Corasick automaton lazily on first call.
+        # No object to construct; just confirm import:
+        self.logger.info(
+            "CountryTagger ready",
+            version=getattr(countrytagger, "__version__", "unknown"),
+            chunk_chars=self.chunk_chars
+        )
+
+    # ---- public API ---------------------------------------------------------
+
+    def extract_geographic_entities(self, title: str, text: str, locations: List[EntityAttributes]) -> list[GeoEntity]:
         """
-        Extract geographic entities from text.
-        
+        Extract country (required) and optional city (bonus) entities from multilingual text.
+
         Args:
-            text: Text to analyze
-            language: Language code for model selection
-            
+            text: raw text (500–100,000+ tokens supported)
+
         Returns:
-            Dictionary containing extracted geographic entities
+            {
+              "countries": [
+                 {"name": "Germany", "alpha2": "DE", "count": 7, "avg_score": 0.90},
+                 ...
+              ],
+              "cities": [],  # (bonus: stays empty unless city_bonus flow is enabled)
+              "extraction_method": "countrytagger.tag_text_countries",
+              "model_used": f"countrytagger {__version__}",
+              "meta": {"chunks": int, "chars": int}
+            }
         """
-        if not self.enabled or not text:
-            return {
-                "countries": [],
-                "cities": [],
-                "regions": [],
-                "other_locations": [],
-                "confidence_scores": {},
-                "language": language,
-                "extraction_method": "disabled"
-            }
-        
-        # Select appropriate model
-        model = self.models.get(language, self.models.get("en"))
-        if not model:
-            logger.warning(f"No model available for language {language}")
-            return {
-                "countries": [],
-                "cities": [],
-                "regions": [],
-                "other_locations": [],
-                "confidence_scores": {},
-                "language": language,
-                "extraction_method": "no_model"
-            }
-        
-        logger.debug(f"Extracting geographic entities from {len(text)} characters in {language}")
-        
-        # Process text with spaCy
-        doc = model(text)
-        
-        # Extract entities
-        countries = []
-        cities = []
-        regions = []
-        other_locations = []
-        confidence_scores = {}
-        
-        for ent in doc.ents:
-            if ent.label_ in ["GPE", "LOC", "FAC"]:  # Geopolitical entities, locations, facilities
-                entity_text = ent.text.strip()
-                entity_type = self._classify_geographic_entity(entity_text, ent.label_)
-                
-                # Normalize entity
-                normalized = self._normalize_geographic_entity(entity_text, entity_type)
-                
-                if normalized:
-                    if entity_type == "country":
-                        countries.append(normalized)
-                    elif entity_type == "city":
-                        cities.append(normalized)
-                    elif entity_type == "region":
-                        regions.append(normalized)
-                    else:
-                        other_locations.append(normalized)
+        try: 
+            
+            if not self.enabled or not text:
+                    return []
                     
-                    # Store confidence score
-                    confidence_scores[entity_text] = {
-                        "normalized": normalized,
-                        "type": entity_type,
-                        "spacy_label": ent.label_,
-                        "confidence": getattr(ent, 'confidence', 0.5)
-                    }
+
+            countries_dict, num_chunks = self._get_countrytragger_countries(text)        
+            countries_from_title_dict, num_chunks_from_title = self._get_countrytragger_countries(title)
+            
+            # BONUS: cities (off by default). This library maps place names -> country code,
+            # but does not emit city names during scanning. If you want a minimal bonus pass,
+            # toggle enable_city_bonus=True and provide your own candidate city strings.
+            cities: List[Dict[str, Any]] = []
+            
+            #countries , countries_from_title -> take top 4 
+            # now merge them
         
-        # Remove duplicates while preserving order
-        countries = list(dict.fromkeys(countries))
-        cities = list(dict.fromkeys(cities))
-        regions = list(dict.fromkeys(regions))
-        other_locations = list(dict.fromkeys(other_locations))
-        
-        return {
-            "countries": countries,
-            "cities": cities,
-            "regions": regions,
-            "other_locations": other_locations,
-            "confidence_scores": confidence_scores,
-            "language": language,
-            "extraction_method": "spacy_ner"
-        }
+            for country_title_key, country_title_value in countries_from_title_dict.items():
+                if country_title_key not in countries_dict:
+                    countries_dict[country_title_key] = country_title_value
+                else:               
+                    countries_dict[country_title_key]["count"] += country_title_value["count"]
+                    countries_dict[country_title_key]["avg_score"] = 1.0
+                    if countries_dict[country_title_key]["avg_score"] < country_title_value["avg_score"]:
+                        countries_dict[country_title_key]["avg_score"] = country_title_value["avg_score"]
+
+            # Convert dict to list
+            countries = list(countries_dict.values())
+            
+            
+            #filter countries
+            countries = [
+                c for c in countries
+                if c["count"] >= 2 and c["avg_score"] >= 0.6
+            ]
+                
+            # --- spaCy validation (chunk-aware) ---
+            if countries and locations:
+                validated_loc_entities = self._validate_loc_entities_with_countrytagger(locations)
+                loc_codes = {alpha2 for alpha2, score in validated_loc_entities}  # only ISO2 codes
+                validated = [c for c in countries if c["alpha2"].lower() in loc_codes]
+                if validated:
+                    countries = validated
+
+            #sort
+            final_countries = sorted(countries, key=lambda d: (-d["count"], -d["avg_score"]))        
+            
+            # take top 4
+            final_countries = countries[:4]
+            
+            #final countries
+            final_countries = [GeoEntity(**c) for c in final_countries]
+            return final_countries
     
-    def _classify_geographic_entity(self, entity_text: str, spacy_label: str) -> str:
-        """Classify a geographic entity as country, city, region, or other."""
-        entity_lower = entity_text.lower()
-        
-        # Check if it's a known country
-        if entity_lower in self.country_mappings:
-            return "country"
-        
-        # Check if it's a known city
-        if entity_lower in self.city_mappings:
-            return "city"
-        
-        # Use spaCy label as hint
-        if spacy_label == "GPE":
-            # Geopolitical entities are usually countries or cities
-            if len(entity_text.split()) == 1:
-                return "city"  # Single word is likely a city
-            else:
-                return "country"  # Multiple words likely a country
-        elif spacy_label == "LOC":
-            return "region"  # Locations are usually regions
-        elif spacy_label == "FAC":
-            return "other"  # Facilities are other locations
-        
-        return "other"
-    
-    def _normalize_geographic_entity(self, entity_text: str, entity_type: str) -> Optional[str]:
-        """Normalize a geographic entity to a standard form."""
-        entity_lower = entity_text.lower()
-        
-        if entity_type == "country":
-            # Check country mappings
-            if entity_lower in self.country_mappings:
-                iso_code = self.country_mappings[entity_lower]
-                try:
-                    country = pycountry.countries.get(alpha_2=iso_code)
-                    return country.name if country else entity_text
-                except Exception:
-                    return entity_text
-            
-            # Try to find by name
-            try:
-                country = pycountry.countries.get(name=entity_text)
-                if country:
-                    return country.name
-            except Exception:
-                pass
-            
-            # Try to find by common name
-            try:
-                country = pycountry.countries.get(common_name=entity_text)
-                if country:
-                    return country.name
-            except Exception:
-                pass
-        
-        elif entity_type == "city":
-            # Check city mappings
-            if entity_lower in self.city_mappings:
-                return self.city_mappings[entity_lower]
-            
-            # Return as-is for cities (no comprehensive database available)
-            return entity_text.title()
-        
-        elif entity_type == "region":
-            # Return as-is for regions
-            return entity_text.title()
-        
-        else:
-            # Return as-is for other locations
-            return entity_text.title()
-    
-    def get_country_info(self, country_name: str) -> Optional[Dict[str, Any]]:
-        """
-        Get detailed information about a country.
-        
-        Args:
-            country_name: Country name or ISO code
-            
-        Returns:
-            Dictionary with country information or None
-        """
-        if not PYCOUNTRY_AVAILABLE:
-            return None
-        
-        try:
-            # Try to find by name
-            country = pycountry.countries.get(name=country_name)
-            if not country:
-                # Try by common name
-                country = pycountry.countries.get(common_name=country_name)
-            if not country:
-                # Try by alpha_2 code
-                country = pycountry.countries.get(alpha_2=country_name.upper())
-            if not country:
-                # Try by alpha_3 code
-                country = pycountry.countries.get(alpha_3=country_name.upper())
-            
-            if country:
-                return {
-                    "name": country.name,
-                    "common_name": getattr(country, 'common_name', country.name),
-                    "alpha_2": country.alpha_2,
-                    "alpha_3": country.alpha_3,
-                    "numeric": country.numeric,
-                    "official_name": getattr(country, 'official_name', country.name)
-                }
         except Exception as e:
-            logger.error(f"Error getting country info for {country_name}: {e}")
+            self.logger.warning("Geotagger failed to extract geographic entities", error=str(e))
+            return []
         
-        return None
     
-    def validate_geographic_entities(self, entities: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Validate and enrich geographic entities with additional information.
-        
-        Args:
-            entities: Dictionary of extracted entities
+    def _get_countrytragger_countries(self, text: str) -> (Dict[str, Dict[str, Any]], int):
+        try:
+            # Accumulators (preserve stable order of first appearance)
+            by_key: OrderedDict[str, Dict[str, Any]] = OrderedDict()
+            counts = defaultdict(int)
+            score_sums = defaultdict(float)
+            num_chunks = 0
+            for num_chunks, chunk in enumerate(self._iter_chunks(text), start=1):
+                try:
+                    # countrytagger.tag_text_countries yields (alpha2_code, score, country_name)
+                    for feature_code, score, country in countrytagger.tag_text_countries(chunk):
+                        if not country:
+                            continue
+                        key = country.lower()
+                        enriched = self.enrich_country(key)
+                        
+                        if key not in by_key:
+                            by_key[key] = {
+                                    "name": enriched["name"],
+                                    "alpha2": enriched["alpha2"],
+                                    "alpha3": enriched["alpha3"],
+                                    "count": 0,
+                                    "avg_score": 0.0,
+                                    }
+                        counts[key] += 1
+                        score_sums[key] += float(score or 0.0)
+                except Exception as e:
+                    # Soft-fail per chunk; continue next
+                    self.logger.warning("CountryTagger failed on a chunk", error=str(e))
+
+            # finalize aggregates
+            for k, row in by_key.items():
+                row["count"] = counts[k]
+                total = counts[k] or 1
+                row["avg_score"] = round(score_sums[k] / total, 4)
+
+            countries = sorted(by_key.values(), key=lambda d: (-d["count"], d["name"]))
             
-        Returns:
-            Enriched entities dictionary
+            # Make it a dict with alpha2 as key
+            countries_dict: Dict[str, Dict[str, Any]] = {country["alpha2"]: country for country in countries}
+            
+           
+            
+            
+            return countries_dict , num_chunks
+        
+        except Exception as e:
+            self.logger.warning("CountryTagger failed on a chunk", error=str(e))
+            return [], 0
+        
+
+    
+    #entiries set[str]
+    def _validate_loc_entities_with_countrytagger(self, loc_entities: List[EntityAttributes]) -> set[str]:
+        valid_entities = set()        
+        #check entites against countrytagger.tag_place(ent)
+        for loc in loc_entities:        
+            
+            if loc.score < 0.80:  #from Davlan/distilbert-base-multilingual-cased-ner-hrl
+                continue  # skip low confidence entities
+            
+            # 1. Exact match
+            code, score, alpha2 = countrytagger.tag_place(loc.text)
+            if code == "PCLI" and alpha2:
+                combined_score = float(loc.score) * float(score or 0.0)
+                
+                valid_entities.add((alpha2.lower(), combined_score))
+                continue
+
+            # 2. Substring match
+            for alpha2, score, country_name in countrytagger.tag_text_countries(loc.text):
+                if pycountry.countries.get(alpha_2=alpha2.upper()):
+                    combined_score = float(loc.score) * float(score or 0.0)
+                    valid_entities.add((alpha2.lower(), combined_score))   
+
+        
+        return valid_entities
+
+    # ---- internals ----------------------------------------------------------
+
+    def _iter_chunks(self, text: str) -> Iterable[str]:
+        """Yield ~chunk_chars-sized pieces on paragraph boundaries to avoid splitting names."""
+        if len(text) <= self.chunk_chars:
+            yield text
+            return
+
+        acc, acc_len = [], 0
+        for line in text.splitlines(keepends=True):
+            if acc_len + len(line) > self.chunk_chars and acc:
+                yield "".join(acc)
+                acc, acc_len = [], 0
+            acc.append(line)
+            acc_len += len(line)
+        if acc:
+            yield "".join(acc)
+
+    # --- optional bonus helper (explicit use only) ---------------------------
+
+    def tag_place(self, place_name: str) -> Dict[str, Any]:
         """
-        if not entities:
-            return entities
+        BONUS helper: classify a single place string into a country using countrytagger.tag_place.
+        Returns empty mapping if not recognized.
+        """
+        try:
+            code, score, country_name = countrytagger.tag_place(place_name)
+        except Exception as e:
+            self.logger.warning("CountryTagger.tag_place failed", error=str(e))
+            return {}
+        if not code and not country_name:
+            return {}
+        return {
+            "query": place_name,
+            "alpha2": code,
+            "country": country_name,
+            "score": float(score or 0.0),
+        }
         
-        enriched_entities = entities.copy()
-        
-        # Enrich countries with additional info
-        enriched_countries = []
-        for country in entities.get("countries", []):
-            country_info = self.get_country_info(country)
-            if country_info:
-                enriched_countries.append({
-                    "name": country,
-                    "info": country_info
-                })
-            else:
-                enriched_countries.append({
-                    "name": country,
-                    "info": None
-                })
-        
-        enriched_entities["countries"] = enriched_countries
-        
-        return enriched_entities
+    def enrich_country(self,iso2: str) -> dict:
+        try:
+            c = pycountry.countries.get(alpha_2=iso2.upper())
+            if c:
+                return {"name": c.name, "alpha2": c.alpha_2, "alpha3": c.alpha_3}
+        except Exception:
+            pass
+        return {"name": iso2.upper(), "alpha2": iso2.upper(), "alpha3": None}
 
 
-# Global geotagger instance
+# Global singleton
 geotagger = Geotagger()
+
+# Module-level entry point (exact name requested)
+def extract_geographic_entities(text: str) -> Dict[str, Any]:
+    return geotagger.extract_geographic_entities(text)

@@ -9,7 +9,7 @@ import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 from bs4 import BeautifulSoup
 
-from src.scraping.scraper import ArticleScraper, ScrapingError
+from src.scraping.scraper import BeautifulSoupExtractor, ScrapingError
 
 
 class TestArticleScraper:
@@ -18,7 +18,7 @@ class TestArticleScraper:
     @pytest.fixture
     def scraper(self):
         """Create a scraper instance for testing."""
-        return ArticleScraper()
+        return BeautifulSoupExtractor()
     
     def test_init(self, scraper):
         """Test scraper initialization."""

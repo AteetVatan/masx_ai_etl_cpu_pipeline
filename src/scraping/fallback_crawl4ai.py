@@ -7,19 +7,19 @@ using Crawl4AI's advanced extraction capabilities.
 
 import asyncio
 from typing import Dict, Any, Optional
-import logging
-
-try:
-    from crawl4ai import AsyncWebCrawler
-    from crawl4ai.extraction_strategy import LLMExtractionStrategy
-    CRAWL4AI_AVAILABLE = True
-except ImportError:
-    CRAWL4AI_AVAILABLE = False
-
-from ..config.settings import settings
 
 
-logger = logging.getLogger(__name__)
+
+from crawl4ai import AsyncWebCrawler
+from crawl4ai.extraction_strategy import LLMExtractionStrategy
+CRAWL4AI_AVAILABLE = True
+
+
+from src.config import get_settings, get_service_logger
+
+
+logger = get_service_logger(__name__)
+settings = get_settings()
 
 
 class Crawl4AIFallback:

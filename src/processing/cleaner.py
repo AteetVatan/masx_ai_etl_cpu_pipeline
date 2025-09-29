@@ -7,13 +7,14 @@ with support for various languages and text formats.
 
 import re
 import unicodedata
-from typing import str, Optional, Dict, Any
-import logging
-
-from ..config.settings import settings
+from typing import Optional, Dict, Any
 
 
-logger = logging.getLogger(__name__)
+from src.config import get_settings, get_service_logger
+
+
+logger = get_service_logger(__name__)
+settings = get_settings()
 
 
 class TextCleaner:

@@ -8,20 +8,21 @@ error handling, and batch operations for high-performance processing.
 import asyncio
 import time
 from typing import Dict, Any, List, Optional, Tuple
+import random
 from datetime import datetime
-import logging
-
-from ..db.db_client import db_client, DatabaseError
-from ..scraping.scraper import scraper, ScrapingError
-from ..scraping.fallback_crawl4ai import fallback_scraper
-from ..processing.cleaner import text_cleaner
-from ..processing.geotagger import geotagger
-from ..processing.image_finder import image_finder
-from ..utils.threadpool import thread_pool
-from ..config.settings import settings
 
 
-logger = logging.getLogger(__name__)
+from src.db import db_connection, DatabaseError
+from src.processing import NewsContentExtractor,EntityTagger, TextCleaner, Geotagger, ImageFinder, ImageDownloader
+from src.services import ProxyService, TranslationManager
+from src.utils.threadpool import thread_pool
+from src.config import get_service_logger, get_settings
+from src.models import FeedModel, ExtractResult, EntityModel, EntityAttributes, GeoEntity
+from src.utils import NlpUtils, LanguageUtils
+
+
+logger = get_service_logger(__name__)
+settings = get_settings()
 
 
 class PipelineManager:
@@ -39,6 +40,21 @@ class PipelineManager:
         self.retry_attempts = settings.retry_attempts
         self.retry_delay = settings.retry_delay
         
+        self.news_content_extractor = NewsContentExtractor()
+        self.text_cleaner = TextCleaner()
+        self.geotagger = Geotagger()
+        self.entity_tagger = EntityTagger()
+        self.image_finder = ImageFinder()
+        self.translation_manager = TranslationManager()
+        self.image_downloader = ImageDownloader()
+        
+        #service
+        self.proxy_service = ProxyService.get_instance()
+        self.nlp_utils = NlpUtils()
+        
+        asyncio.run(self.proxy_service.ping_start_proxy())
+        
+        
         # Pipeline statistics
         self.stats = {
             "total_processed": 0,
@@ -53,7 +69,7 @@ class PipelineManager:
         
         logger.info("Pipeline manager initialized")
     
-    async def process_article(self, article_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def process_article(self, article_data: FeedModel, date: str) -> Dict[str, Any]:
         """
         Process a single article through the complete pipeline.
         
@@ -63,35 +79,84 @@ class PipelineManager:
         Returns:
             Dictionary containing processing results
         """
-        article_id = article_data.get("id", "unknown")
-        url = article_data.get("url", "")
-        
+        article_id = article_data.id
+        flashpoint_id = article_data.flashpoint_id
+        url = article_data.url
+        title = article_data.title
+        original_image = article_data.original_image
+
         logger.info(f"Starting pipeline processing for article {article_id}: {url}")
         
         start_time = time.time()
         processing_steps = []
         errors = []
-        
+        extracted_data: ExtractResult = None
         try:
+            
+            # test = 'Negacionismo parlamentar põe no lixo 44 anos da política ambiental brasileira e PL da Devastação abre brecha à criação de "vales da morte" de Norte a Sul. Entrevista especial com Suely Araújo'
+            # #test = 'Negacionismo parlamentar põe no lixo 44 anos da'
+            # test_res = await self.translation_manager.translate(test, target="en")
+            # logger.info(f"Translation: {test_res}")
+           
+            extracted_data = ExtractResult()
+            extracted_data.id = article_id
+            extracted_data.parent_id = flashpoint_id
+            extracted_data.url = url
+            extracted_data.title = title
+            extracted_data.images = [original_image]
+            extracted_data.article_source_country = article_data.source_country
+            
+            
             # Step 1: Scrape article content
             logger.debug(f"Step 1: Scraping article {article_id}")
-            scraped_data = await self._scrape_article(url)
+            extracted_data = await self._scrape_article(extracted_data)
             processing_steps.append("scraping")
             
-            # Step 2: Clean text content
-            logger.debug(f"Step 2: Cleaning text for article {article_id}")
-            cleaned_data = await self._clean_text(scraped_data)
-            processing_steps.append("cleaning")
+            # Step 2: Set the language of the extracted data
+            logger.debug(f"Step 2: Setting the language of the article {article_id}")
+            extracted_data = await self._set_extracted_language(extracted_data)
+            processing_steps.append("language_setting")            
             
-            # Step 3: Extract geographic entities
-            logger.debug(f"Step 3: Geotagging article {article_id}")
-            geotagged_data = await self._geotag_article(cleaned_data)
+            # Step 3: Translate title 
+            logger.debug(f"Step 3: Translating title and language detection for article {article_id}")
+            extracted_data = await self._translate_title(extracted_data)
+            processing_steps.append("translation")
+                        
+            # Step 4: Metadata extraction
+            logger.debug(f"Step 4: Extracting entities for article {article_id}")
+            extracted_data = await self._extract_entities(extracted_data)
+            processing_steps.append("entity_extraction")
+            
+            
+            # Step 5: Extract geographic entities
+            logger.debug(f"Step 5: Geotagging article {article_id}")
+            extracted_data = await self._geotag_article(extracted_data)
             processing_steps.append("geotagging")
             
-            # Step 4: Find relevant images
-            logger.debug(f"Step 4: Finding images for article {article_id}")
-            enriched_data = await self._find_images(geotagged_data)
+            # Step 6: Find relevant images
+            logger.debug(f"Step 6: Finding images for article {article_id}") 
+            extracted_data = await self._find_images(extracted_data)
             processing_steps.append("image_search")
+            
+            
+            # Step 7: download images to supabase
+            logger.debug(f"Step 7: Downloading images to supabase for article {article_id}")
+            extracted_data = await self._download_images(date, flashpoint_id, extracted_data)
+            processing_steps.append("image_download")
+   
+            
+            #here update the article data with the extracted data
+            article_data.title = extracted_data.title
+            article_data.title_en = extracted_data.title_en
+            article_data.language = extracted_data.language
+            article_data.author = extracted_data.author
+            article_data.published_date = extracted_data.published_date
+            article_data.content = extracted_data.content
+            article_data.images = extracted_data.images
+            article_data.hostname = extracted_data.hostname if extracted_data.hostname else article_data.hostname
+            article_data.entities = extracted_data.entities
+            article_data.geo_entities = extracted_data.geo_entities
+                      
             
             # Calculate processing time
             processing_time = time.time() - start_time
@@ -106,7 +171,7 @@ class PipelineManager:
                 "status": "completed",
                 "processing_time": processing_time,
                 "processing_steps": processing_steps,
-                "enriched_data": enriched_data,
+                "enriched_data": article_data,
                 "errors": errors,
                 "timestamp": datetime.utcnow().isoformat()
             }
@@ -133,7 +198,7 @@ class PipelineManager:
                 "timestamp": datetime.utcnow().isoformat()
             }
     
-    async def process_batch(self, article_ids: List[str]) -> Dict[str, Any]:
+    async def process_batch(self, article_ids: List[str], date: str) -> Dict[str, Any]:
         """
         Process a batch of articles in parallel.
         
@@ -172,7 +237,7 @@ class PipelineManager:
                 task = thread_pool.submit_task(
                     self.process_article,
                     article,
-                    task_name=f"process_article_{article.get('id', 'unknown')}"
+                    date
                 )
                 tasks.append(task)
             
@@ -199,6 +264,9 @@ class PipelineManager:
                         "errors": [str(e)],
                         "timestamp": datetime.utcnow().isoformat()
                     })
+                    
+                    
+            #enriched_data is the article_data with the extracted data
             
             # Update database with results
             await self._update_articles_batch(results)
@@ -230,20 +298,68 @@ class PipelineManager:
                 "results": results
             }
     
-    async def _scrape_article(self, url: str) -> Dict[str, Any]:
+    async def _scrape_article(self, extracted_data: ExtractResult) -> ExtractResult:
         """Scrape article content with fallback."""
         try:
             # Try primary scraper first
-            return await scraper.scrape_article(url)
-        except ScrapingError as e:
-            logger.warning(f"Primary scraper failed for {url}: {e}")
+            extracted_data: ExtractResult = await self.news_content_extractor.extract_feed(extracted_data.url)
+            return extracted_data
+        except Exception as e:  
+            logger.error(f"Fallback scraper also failed for {extracted_data.ur}: {e}")
+            raise e
+        
+        
+    async def _set_extracted_language(self, extracted: ExtractResult) -> ExtractResult:
+        """Scrape article content with fallback."""        
+        try:            
+            title = extracted.title
+            text = extracted.content[:500]
             
-            # Try fallback scraper
-            try:
-                return await fallback_scraper.scrape_article(url)
-            except Exception as fallback_error:
-                logger.error(f"Fallback scraper also failed for {url}: {fallback_error}")
-                raise ScrapingError(f"Both scrapers failed: {e}, {fallback_error}")
+            sentences = self.nlp_utils.split_sentences(text)            
+            # take random 5 sentences
+            if len(sentences) > 3:
+                sample_sentences = random.sample(sentences, 3)
+            else:
+                sample_sentences = sentences
+
+            sample_sentences.append(title)
+            
+            languages = []
+            for sentence in sample_sentences:
+                language = LanguageUtils.detect_language(sentence)                
+                if language:
+                    languages.append(language)
+                    
+            #get most common language from languages list
+            from collections import Counter
+            most_common_language = Counter(languages).most_common(1)[0][0]
+            
+            extracted.language = most_common_language
+
+            return extracted
+        
+        except Exception as e:
+            logger.error(f"Language detection failed: {e}")
+            extracted.language = ""
+        return extracted
+            
+            
+  
+    
+    # async def _scrape_article(self, url: str) -> Dict[str, Any]:
+    #     """Scrape article content with fallback."""
+    #     try:
+    #         # Try primary scraper first
+    #         return await scraper.scrape_article(url)
+    #     except ScrapingError as e:
+    #         logger.warning(f"Primary scraper failed for {url}: {e}")
+            
+    #         # Try fallback scraper
+    #         try:
+    #             return await fallback_scraper.scrape_article(url)
+    #         except Exception as fallback_error:
+    #             logger.error(f"Fallback scraper also failed for {url}: {fallback_error}")
+    #             raise ScrapingError(f"Both scrapers failed: {e}, {fallback_error}")
     
     async def _clean_text(self, scraped_data: Dict[str, Any]) -> Dict[str, Any]:
         """Clean and normalize text content."""
@@ -251,7 +367,7 @@ class PipelineManager:
         language = scraped_data.get("language", "en")
         
         # Clean the text
-        cleaned_result = text_cleaner.clean_text(content, language)
+        cleaned_result = self.text_cleaner.clean_text(content, language)
         
         # Update scraped data with cleaned content
         scraped_data["content"] = cleaned_result["cleaned_text"]
@@ -264,59 +380,144 @@ class PipelineManager:
         
         return scraped_data
     
-    async def _geotag_article(self, article_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract geographic entities from article."""
-        content = article_data.get("content", "")
-        language = article_data.get("language", "en")
+    async def _translate_title(self, extracted_data: ExtractResult) -> ExtractResult:
+        """Translate title and language detection."""
+        if extracted_data.language == "en":
+            extracted_data.title_en = extracted_data.title
+            return extracted_data
         
-        # Extract geographic entities
-        geo_entities = geotagger.extract_geographic_entities(content, language)
+        title = extracted_data.title
+        language = extracted_data.language
         
-        # Add geographic data to article
-        article_data["geographic_entities"] = geo_entities
+        proxies = await self.proxy_service.get_proxy_cache()
+       
         
-        return article_data
+        title_en = await self.translation_manager.translate(title,source=language, target="en",  proxies=proxies	)
+        extracted_data.title_en = title_en if title_en else ""
+        return extracted_data
     
-    async def _find_images(self, article_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def _extract_entities(self, extracted_data: ExtractResult) -> EntityModel:
+        """Extract entities from article."""        
+        content = extracted_data.content        
+        entities: EntityModel = self.entity_tagger.extract_entities(content)
+        extracted_data.entities = entities
+        return extracted_data
+    
+    async def _geotag_article(self, extracted_data: ExtractResult) -> ExtractResult:
+        """Extract geographic entities from article."""
+        #content = article_data.get("content", "")
+        #language = article_data.get("language", "en")
+        title = extracted_data.title
+        content = extracted_data.content
+        locations = extracted_data.entities.LOC        
+        
+        #processing_steps.append("geotagging")
+        # Extract geographic entities
+        geo_entities: list[GeoEntity] = self.geotagger.extract_geographic_entities(title, content, locations)        
+        extracted_data.geo_entities = geo_entities
+        
+        return extracted_data
+    
+    async def _find_images(self, extracted_data: ExtractResult) -> ExtractResult:
         """Find relevant images for the article."""
-        title = article_data.get("title", "")
-        content = article_data.get("content", "")
-        language = article_data.get("language", "en")
-        
-        # Generate search queries
-        search_queries = image_finder.generate_search_queries(title, content, language)
-        
-        # Find images using the best query
-        images_data = None
-        for query in search_queries:
-            try:
-                images_data = await image_finder.find_images(query, max_images=3, language=language)
-                if images_data.get("images"):
-                    break
-            except Exception as e:
-                logger.warning(f"Image search failed for query '{query}': {e}")
-                continue
-        
-        # Add image data to article
-        article_data["images"] = images_data.get("images", []) if images_data else []
-        article_data["image_search_metadata"] = {
-            "queries_used": search_queries,
-            "search_method": images_data.get("search_method", "none") if images_data else "none",
-            "total_found": images_data.get("total_found", 0) if images_data else 0
-        }
-        
-        return article_data
+        try:          
+            language = extracted_data.language
+            images = list()
+            # Generate search queries
+            search_queries = self.image_finder.generate_search_queries(extracted_data)            
+            # Find images using the best query
+            images_data = None
+            
+            regions = set()
+            
+            if extracted_data.geo_entities and len(extracted_data.geo_entities) > 0:
+                country = extracted_data.geo_entities[0].name            
+            else:
+                country = None
+            
+            regions =  self.image_finder.get_all_duckduckgo_regions(language, country)
+            
+            images = set()
+            #images_data_set = list()
+            
+            for region in regions:
+            
+                if extracted_data.title:
+                    try:            
+                        images_data = await self.image_finder.find_images(extracted_data.title, 
+                                                                    max_images=10, 
+                                                                    duckduckgo_region=region)
+                        if images_data.get("images"):
+                            images.update(images_data.get("images"))
+                            #images_data_set.extend(images_data.get("images_data"))
+                    except Exception as e:
+                        logger.warning(f"Image search failed for title '{extracted_data.title}': {e}")
+                        continue
+                    
+                    
+            if len(images) < 3 and extracted_data.title_en:               
+                for region in regions:                
+                    if extracted_data.title_en:
+                        try:
+                            images_data = await self.image_finder.find_images(extracted_data.title_en, 
+                                                                        max_images=5, 
+                                                                        duckduckgo_region=region)
+                            if images_data.get("images"):
+                                images.extend(images_data.get("images"))
+                        except Exception as e:
+                            logger.warning(f"Image search failed for title_en '{extracted_data.title_en}': {e}")
+                            continue
+                    
+                
+            # if len(images) < 3:
+            #     for region in regions:
+            #         for query in search_queries:
+            #             try:
+            #                 images_data = await self.image_finder.find_images(query, 
+            #                                                                 max_images=1, 
+            #                                                                 duckduckgo_region=region)
+            #                 if images_data.get("images"):
+            #                     images.extend(images_data.get("images"))
+            #                     break
+            #             except Exception as e:
+            #                 logger.warning(f"Image search failed for query '{query}': {e}")
+            #                 continue
+
+                        
+            if len(images) > 0:          
+                extracted_data.images.extend(list(images))                
+                # remove  empty
+                extracted_data.images = [image for image in extracted_data.images if image]
+
+            return extracted_data
+        except Exception as e:
+            logger.error(f"Image search failed: {e}")
+            extracted_data.images = []
+            return extracted_data
+    
+    async def _download_images(self, date: str, flashpoint_id: str, extracted_data: ExtractResult) -> ExtractResult:
+        """Download images to supabase."""
+        try:
+            
+            extracted_data = await self.image_downloader.download_images(date, flashpoint_id, extracted_data)
+                
+                
+                
+        except Exception as e:
+            logger.error(f"Image download failed: {e}")
+            extracted_data.images = []
+        return extracted_data
     
     async def _fetch_articles_batch(self, article_ids: List[str]) -> List[Dict[str, Any]]:
         """Fetch articles from database by IDs."""
         try:
             # Connect to database if not already connected
-            if not db_client.client:
-                await db_client.connect()
+            if not db_connection.client:
+                await db_connection.connect()
             
             articles = []
             for article_id in article_ids:
-                article = await db_client.fetch_article_by_id(article_id)
+                article = await db_connection.fetch_article_by_id(article_id)
                 if article:
                     articles.append(article)
             
@@ -330,8 +531,8 @@ class PipelineManager:
         """Update articles in database with processing results."""
         try:
             # Connect to database if not already connected
-            if not db_client.client:
-                await db_client.connect()
+            if not db_connection.client:
+                await db_connection.connect()
             
             updates = []
             for result in results:
@@ -354,7 +555,7 @@ class PipelineManager:
                 updates.append(update_data)
             
             if updates:
-                successful_updates, failed_updates = await db_client.update_articles_batch(updates)
+                successful_updates, failed_updates = await db_connection.update_articles_batch(updates)
                 logger.info(f"Updated {successful_updates} articles, {failed_updates} failed")
             
         except DatabaseError as e:
@@ -375,10 +576,10 @@ class PipelineManager:
     async def _get_database_stats(self) -> Dict[str, Any]:
         """Get database processing statistics."""
         try:
-            if not db_client.client:
-                await db_client.connect()
+            if not db_connection.client:
+                await db_connection.connect()
             
-            return await db_client.get_processing_stats()
+            return await db_connection.get_processing_stats()
         except Exception as e:
             logger.error(f"Failed to get database stats: {e}")
             return {"error": str(e)}
@@ -400,10 +601,10 @@ class PipelineManager:
         
         # Check database connection
         try:
-            if not db_client.client:
-                await db_client.connect()
+            if not db_connection.client:
+                await db_connection.connect()
             
-            await db_client._test_connection()
+            await db_connection._test_client()
             health_status["components"]["database"] = {
                 "status": "healthy",
                 "details": "Connected successfully"
@@ -427,13 +628,13 @@ class PipelineManager:
         }
         
         health_status["components"]["geotagger"] = {
-            "status": "healthy" if geotagger.enabled else "disabled",
-            "details": "Available" if geotagger.enabled else "Disabled"
+            "status": "healthy" if self.geotagger.enabled else "disabled",
+            "details": "Available" if self.geotagger.enabled else "Disabled"
         }
         
         health_status["components"]["image_finder"] = {
-            "status": "healthy" if image_finder.enabled else "disabled",
-            "details": "Available" if image_finder.enabled else "Disabled"
+            "status": "healthy" if self.image_finder.enabled else "disabled",
+            "details": "Available" if self.image_finder.enabled else "Disabled"
         }
         
         return health_status
@@ -446,7 +647,7 @@ class PipelineManager:
         thread_pool.shutdown(wait=True, timeout=30)
         
         # Disconnect from database
-        await db_client.disconnect()
+        await db_connection.disconnect()
         
         logger.info("Pipeline manager shutdown completed")
 

@@ -26,8 +26,8 @@ class TestAPIServer:
         """Test settings for API testing."""
         return Settings(
             supabase_url="https://test.supabase.co",
-            supabase_key="test_key",
-            supabase_service_key="test_service_key",
+            supabase_anon_key="test_key",
+            supabase_service_role_key="test_service_key",
             db_host="localhost",
             db_name="test_db",
             db_user="test_user",

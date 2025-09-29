@@ -5,7 +5,6 @@ Provides production-ready REST API endpoints for feed processing
 and system monitoring with comprehensive error handling.
 """
 
-import logging
 from typing import Dict, Any
 from datetime import datetime
 from contextlib import asynccontextmanager
@@ -17,21 +16,21 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import uvicorn
 
-from ..config.settings import settings
+from src.config import get_settings, get_api_logger
 from ..pipeline.pipeline_manager import pipeline_manager
-from ..db.db_client import db_client, DatabaseClient, DatabaseError
+from src.db import db_connection, DatabaseClientAndPool
+from src.db import DatabaseError
 from ..processing.cleaner import text_cleaner
 from ..processing.geotagger import geotagger
 from ..processing.image_finder import image_finder
 from ..processing.feed_processor import feed_processor
+from ..utils.date_validation import validate_and_raise, get_today_date
 
 
-# Configure logging
-logging.basicConfig(
-    level=getattr(logging, settings.log_level),
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+
+
+logger = get_api_logger(__name__)
+settings = get_settings()
 
 
 # Pydantic models for API requests/responses
@@ -95,7 +94,7 @@ async def lifespan(app: FastAPI):
     
     try:
         # Initialize database connection
-        await db_client.connect()
+        await db_connection.connect()
         logger.info("Database connection established")
         
         # Initialize pipeline manager
@@ -112,7 +111,7 @@ async def lifespan(app: FastAPI):
         await pipeline_manager.shutdown()
         
         # Disconnect from database
-        await db_client.disconnect()
+        await db_connection.disconnect()
         
         logger.info("Server shutdown completed")
 
@@ -142,9 +141,9 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 # Dependency for database connection
 async def get_db_client():
     """Dependency to ensure database connection."""
-    if not db_client.client:
-        await db_client.connect()
-    return db_client
+    if not db_connection.client:
+        await db_connection.connect()
+    return db_connection
 
 
 # API Endpoints
@@ -248,7 +247,7 @@ async def test_image_finder(query: str, max_images: int = 3, language: str = "en
 @app.post("/feed/warmup", response_model=FeedWarmupResponse)
 async def warmup_feed_entries(
     date: str = None,
-    db: DatabaseClient = Depends(get_db_client)
+    db: DatabaseClientAndPool = Depends(get_db_client)
 ):
     """
     Warm up the server by loading feed entries for a specific date.
@@ -259,16 +258,17 @@ async def warmup_feed_entries(
     try:
         # Use today's date if not provided
         if not date:
-            date = datetime.now().strftime("%Y%m%d")
+            date = get_today_date()
         
         # Validate date format
         try:
-            datetime.strptime(date, "%Y%m%d")
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Date must be in YYYYMMDD format")
+            validated_date = validate_and_raise(date, "date")
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
         
         # Warm up the server
-        result = await feed_processor.warm_up_server(date)
+        feed_processor.set_date(validated_date)
+        result = await feed_processor.warm_up_server()
         
         return FeedWarmupResponse(**result)
         
@@ -283,7 +283,7 @@ async def warmup_feed_entries(
 @app.post("/feed/process", response_model=FeedProcessResponse)
 async def process_feed_entries(
     date: str = None,
-    db: DatabaseClient = Depends(get_db_client)
+    db: DatabaseClientAndPool = Depends(get_db_client)
 ):
     """
     Process all feed entries for a specific date.
@@ -295,16 +295,17 @@ async def process_feed_entries(
     try:
         # Use today's date if not provided
         if not date:
-            date = datetime.now().strftime("%Y%m%d")
+            date = get_today_date()
         
         # Validate date format
         try:
-            datetime.strptime(date, "%Y%m%d")
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Date must be in YYYYMMDD format")
+            validated_date = validate_and_raise(date, "date")
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
         
         # Process feed entries
-        result = await feed_processor.process_feed_entries_by_date(date)
+        feed_processor.set_date(validated_date)
+        result = await feed_processor.process_feed_entries()
         
         return FeedProcessResponse(**result)
         
@@ -320,7 +321,7 @@ async def process_feed_entries(
 async def process_feed_entries_by_flashpoint(
     date: str = None,
     flashpoint_id: str = None,
-    db: DatabaseClient = Depends(get_db_client)
+    db: DatabaseClientAndPool = Depends(get_db_client)
 ):
     """
     Process feed entries for a specific date and flashpoint ID.
@@ -332,20 +333,21 @@ async def process_feed_entries_by_flashpoint(
     try:
         # Use today's date if not provided
         if not date:
-            date = datetime.now().strftime("%Y%m%d")
+            date = get_today_date()
         
         # Validate date format
         try:
-            datetime.strptime(date, "%Y%m%d")
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Date must be in YYYYMMDD format")
+            validated_date = validate_and_raise(date, "date")
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
         
         # Validate flashpoint_id
         if not flashpoint_id:
             raise HTTPException(status_code=400, detail="flashpoint_id is required")
         
         # Process feed entries by flashpoint ID
-        result = await feed_processor.process_feed_entries_by_flashpoint_id(date, flashpoint_id)
+        feed_processor.set_date(validated_date)
+        result = await feed_processor.process_feed_entries_by_flashpoint_id(flashpoint_id)
         
         return FeedProcessFlashpointResponse(**result)
         
@@ -360,7 +362,7 @@ async def process_feed_entries_by_flashpoint(
 @app.get("/feed/entries/{date}")
 async def get_feed_entries(
     date: str,
-    db: DatabaseClient = Depends(get_db_client)
+    db: DatabaseClientAndPool = Depends(get_db_client)
 ):
     """
     Get loaded feed entries for a specific date.
@@ -370,15 +372,16 @@ async def get_feed_entries(
     try:
         # Validate date format
         try:
-            datetime.strptime(date, "%Y%m%d")
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Date must be in YYYYMMDD format")
+            validated_date = validate_and_raise(date, "date")
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
         
         # Get feed entries from memory
-        feed_entries = feed_processor.get_feed_entries_for_date(date)
+        feed_processor.set_date(validated_date)
+        feed_entries = feed_processor.get_feed_entries()
         
         return {
-            "date": date,
+            "date": validated_date,
             "total_entries": len(feed_entries),
             "entries": feed_entries
         }
@@ -415,16 +418,16 @@ async def clear_feed_entries(date: str):
     try:
         # Validate date format
         try:
-            datetime.strptime(date, "%Y%m%d")
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Date must be in YYYYMMDD format")
+            validated_date = validate_and_raise(date, "date")
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
         
         # Clear feed entries
-        feed_processor.clear_feed_entries(date)
+        feed_processor.clear_feed_entries(validated_date)
         
         return {
-            "message": f"Cleared feed entries for date {date}",
-            "date": date,
+            "message": f"Cleared feed entries for date {validated_date}",
+            "date": validated_date,
             "timestamp": datetime.utcnow().isoformat()
         }
         

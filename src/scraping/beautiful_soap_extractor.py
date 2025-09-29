@@ -7,22 +7,24 @@ comprehensive error handling, retry logic, and content extraction.
 
 import asyncio
 import re
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Dict, Any, Optional, List
 from urllib.parse import urljoin, urlparse
 from datetime import datetime
-import logging
+
 
 import httpx
 from bs4 import BeautifulSoup, Comment
 from bs4.element import NavigableString
 
-from ..config.settings import settings
+from src.config import get_settings, get_service_logger
+from src.models import ExtractResult
 
 
-logger = logging.getLogger(__name__)
+logger = get_service_logger(__name__)
+settings = get_settings()
 
 
-class ArticleScraper:
+class BeautifulSoupExtractor:
     """
     High-performance article scraper with multiple extraction strategies.
     
@@ -36,18 +38,7 @@ class ArticleScraper:
         self.max_retries = settings.retry_attempts
         self.retry_delay = settings.retry_delay
         
-        # Common headers to avoid detection
-        self.headers = {
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-            ),
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.5",
-            "Accept-Encoding": "gzip, deflate",
-            "Connection": "keep-alive",
-            "Upgrade-Insecure-Requests": "1",
-        }
+      
         
         # Common article selectors for different sites
         self.article_selectors = [
@@ -93,7 +84,7 @@ class ArticleScraper:
             '.timestamp'
         ]
     
-    async def scrape_article(self, url: str) -> Dict[str, Any]:
+    async def scrape_article(self, url: str, proxy: str) -> ExtractResult:
         """
         Scrape an article from the given URL.
         
@@ -111,24 +102,29 @@ class ArticleScraper:
         
         logger.info(f"Starting to scrape article: {url}")
         
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                        "AppleWebKit/537.36 (KHTML, like Gecko) "
+                        "Chrome/120.0 Safari/537.36"
+        }
+        
+        timeout = httpx.Timeout(30.0, connect=15.0)
         for attempt in range(self.max_retries):
             try:
                 async with httpx.AsyncClient(
-                    headers=self.headers,
+                    headers=headers,
+                    proxy=f"http://{proxy}",
                     timeout=self.timeout,
                     follow_redirects=True
                 ) as client:
-                    response = await client.get(url)
+                    response = await client.get(url)                
+                    
                     response.raise_for_status()
-                    
-                    # Parse the HTML content
-                    soup = BeautifulSoup(response.content, 'html.parser')
-                    
                     # Extract article content
-                    article_data = self._extract_article_data(soup, url)
+                    article_data: ExtractResult = await self.beautifulSoup_from_html(response.content, url)
                     
                     # Validate extracted content
-                    if not article_data.get('content') or len(article_data['content'].strip()) < 100:
+                    if not article_data.content or len(article_data.content.strip()) < 100:
                         raise ScrapingError("Insufficient content extracted")
                     
                     logger.info(f"Successfully scraped article: {url}")
@@ -170,7 +166,7 @@ class ArticleScraper:
         except Exception:
             return False
     
-    def _extract_article_data(self, soup: BeautifulSoup, url: str) -> Dict[str, Any]:
+    async def beautifulSoup_from_html(self, html: str, url: str) -> ExtractResult:
         """
         Extract article data from parsed HTML.
         
@@ -182,6 +178,10 @@ class ArticleScraper:
             Dictionary with extracted article data
         """
         # Remove unwanted elements
+        
+        
+        soup = BeautifulSoup(html, 'html.parser')
+        
         self._clean_soup(soup)
         
         # Extract title
@@ -202,18 +202,20 @@ class ArticleScraper:
         # Extract metadata
         metadata = self._extract_metadata(soup)
         
-        return {
-            "url": url,
-            "title": title,
-            "author": author,
-            "published_date": published_date,
-            "content": content,
-            "images": images,
-            "metadata": metadata,
-            "scraped_at": datetime.utcnow().isoformat(),
-            "word_count": len(content.split()) if content else 0,
-            "language": self._detect_language(content)
-        }
+        
+        result = ExtractResult(
+                url=url,
+                title=title,
+                author=author,
+                published_date=published_date,
+                content=content,
+                images=images if images else None,
+                hostname=url,
+                metadata=metadata,
+                scraped_at=datetime.utcnow().isoformat(),
+                word_count=len(content.split()),
+            )
+        return result
     
     def _clean_soup(self, soup: BeautifulSoup) -> None:
         """Remove unwanted elements from the soup."""
@@ -357,43 +359,8 @@ class ArticleScraper:
             if property_name and content:
                 metadata[property_name] = content
         
-        return metadata
+        return metadata    
     
-    def _detect_language(self, text: str) -> str:
-        """Simple language detection based on common words."""
-        if not text:
-            return "unknown"
-        
-        # Simple heuristic based on common words
-        text_lower = text.lower()
-        
-        # English indicators
-        english_words = ['the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by']
-        english_count = sum(1 for word in english_words if word in text_lower)
-        
-        # Spanish indicators
-        spanish_words = ['el', 'la', 'de', 'que', 'y', 'a', 'en', 'un', 'es', 'se', 'no', 'te', 'lo', 'le']
-        spanish_count = sum(1 for word in spanish_words if word in text_lower)
-        
-        # French indicators
-        french_words = ['le', 'de', 'et', 'à', 'un', 'il', 'être', 'et', 'en', 'avoir', 'que', 'pour', 'dans']
-        french_count = sum(1 for word in french_words if word in text_lower)
-        
-        # German indicators
-        german_words = ['der', 'die', 'und', 'in', 'den', 'von', 'zu', 'das', 'mit', 'sich', 'des', 'auf', 'für']
-        german_count = sum(1 for word in german_words if word in text_lower)
-        
-        # Determine language based on word counts
-        if english_count > max(spanish_count, french_count, german_count):
-            return "en"
-        elif spanish_count > max(english_count, french_count, german_count):
-            return "es"
-        elif french_count > max(english_count, spanish_count, german_count):
-            return "fr"
-        elif german_count > max(english_count, spanish_count, french_count):
-            return "de"
-        else:
-            return "unknown"
 
 
 class ScrapingError(Exception):
@@ -402,4 +369,7 @@ class ScrapingError(Exception):
 
 
 # Global scraper instance
-scraper = ArticleScraper()
+beautiful_soap_extractor = BeautifulSoupExtractor()
+
+def get_beautiful_soap_extractor():
+    return beautiful_soap_extractor

@@ -12,12 +12,13 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Callable, Any, List, Dict, Optional, Tuple
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-import logging
-
-from ..config.settings import settings
 
 
-logger = logging.getLogger(__name__)
+from src.config import get_settings, get_service_logger
+
+
+logger = get_service_logger(__name__)
+settings = get_settings()
 
 
 @dataclass

@@ -9,66 +9,17 @@ proper configuration and error handling.
 import os
 import sys
 import asyncio
-import logging
+from src.config import get_service_logger, get_settings
 from pathlib import Path
 
 # Add src directory to Python path
 src_path = Path(__file__).parent / "src"
 sys.path.insert(0, str(src_path))
 
-from src.config.settings import settings
 from src.api.server import app
 import uvicorn
 
-
-def setup_logging():
-    """Configure logging for the application."""
-    log_level = getattr(logging, settings.log_level.upper(), logging.INFO)
-    
-    if settings.log_format.lower() == "json":
-        # JSON logging for production
-        import json
-        import time
-        
-        class JSONFormatter(logging.Formatter):
-            def format(self, record):
-                log_entry = {
-                    "timestamp": time.time(),
-                    "level": record.levelname,
-                    "logger": record.name,
-                    "message": record.getMessage(),
-                    "module": record.module,
-                    "function": record.funcName,
-                    "line": record.lineno
-                }
-                
-                if record.exc_info:
-                    log_entry["exception"] = self.formatException(record.exc_info)
-                
-                return json.dumps(log_entry)
-        
-        formatter = JSONFormatter()
-    else:
-        # Text logging for development
-        formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
-    
-    # Configure root logger
-    logging.basicConfig(
-        level=log_level,
-        format=formatter,
-        handlers=[
-            logging.StreamHandler(sys.stdout)
-        ]
-    )
-    
-    # Set specific loggers
-    logging.getLogger("uvicorn").setLevel(logging.INFO)
-    logging.getLogger("uvicorn.access").setLevel(logging.INFO)
-    logging.getLogger("fastapi").setLevel(logging.INFO)
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-    logging.getLogger("httpcore").setLevel(logging.WARNING)
+settings = get_settings()
 
 
 def check_environment():
@@ -123,8 +74,8 @@ def main():
     """Main entry point for the application."""
     try:
         # Setup logging
-        setup_logging()
-        logger = logging.getLogger(__name__)
+        
+        logger = get_service_logger(__name__)
         
         # Check environment
         if not check_environment():
@@ -154,7 +105,7 @@ def main():
         sys.exit(0)
     except Exception as e:
         print(f"❌ Error starting server: {e}")
-        logging.error(f"Failed to start server: {e}", exc_info=True)
+        logger.error(f"Failed to start server: {e}", exc_info=True)
         sys.exit(1)
 
 

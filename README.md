@@ -214,7 +214,7 @@ curl "http://localhost:8000/articles?limit=10&status=completed"
 curl -X POST "http://localhost:8000/feed/warmup"
 
 # Load feed entries for specific date
-curl -X POST "http://localhost:8000/feed/warmup?date=20250702"
+curl -X POST "http://localhost:8000/feed/warmup?date=2025-07-02"
 ```
 
 #### Process All Feed Entries
@@ -223,13 +223,13 @@ curl -X POST "http://localhost:8000/feed/warmup?date=20250702"
 curl -X POST "http://localhost:8000/feed/process"
 
 # Process all entries for specific date
-curl -X POST "http://localhost:8000/feed/process?date=20250702"
+curl -X POST "http://localhost:8000/feed/process?date=2025-07-02"
 ```
 
 #### Process Feed Entries by Flashpoint ID
 ```bash
 # Process entries for specific flashpoint ID
-curl -X POST "http://localhost:8000/feed/process/flashpoint?date=20250702&flashpoint_id=123e4567-e89b-12d3-a456-426614174000"
+curl -X POST "http://localhost:8000/feed/process/flashpoint?date=2025-07-02&flashpoint_id=123e4567-e89b-12d3-a456-426614174000"
 ```
 
 #### Get Feed Statistics
@@ -239,13 +239,13 @@ curl http://localhost:8000/feed/stats
 
 #### Get Loaded Feed Entries
 ```bash
-curl "http://localhost:8000/feed/entries/20250702"
+curl "http://localhost:8000/feed/entries/2025-07-02"
 ```
 
 #### Clear Feed Entries from Memory
 ```bash
 # Clear specific date
-curl -X DELETE "http://localhost:8000/feed/clear/20250702"
+curl -X DELETE "http://localhost:8000/feed/clear/2025-07-02"
 
 # Clear all dates
 curl -X DELETE "http://localhost:8000/feed/clear"
@@ -255,7 +255,7 @@ curl -X DELETE "http://localhost:8000/feed/clear"
 
 The application now supports processing feed entries from date-based tables:
 
-1. **Warm Up**: Load feed entries from `feed_entries_{date}` table into memory
+1. **Warm Up**: Load feed entries from `feed_entries_{date}` table into memory (date in YYYY-MM-DD format)
 2. **Process**: Run complete pipeline (scrape → clean → geotag → find image → save to DB)
 3. **Filter**: Process specific entries by flashpoint_id
 4. **Monitor**: Track processing statistics and performance
@@ -300,15 +300,15 @@ async def process_articles():
 
 async def process_feed_entries():
     # Warm up server with feed entries
-    warmup_result = await feed_processor.warm_up_server("20250702")
+    warmup_result = await feed_processor.warm_up_server("2025-07-02")
     print(f"Warmed up with {warmup_result['total_entries']} entries")
     
     # Process all feed entries
-    process_result = await feed_processor.process_feed_entries_by_date("20250702")
+    process_result = await feed_processor.process_feed_entries_by_date("2025-07-02")
     print(f"Processed: {process_result['successful']} successful, {process_result['failed']} failed")
     
     # Process specific flashpoint
-    flashpoint_result = await feed_processor.process_feed_entries_by_flashpoint_id("20250702", "flashpoint_123")
+    flashpoint_result = await feed_processor.process_feed_entries_by_flashpoint_id("2025-07-02", "flashpoint_123")
     print(f"Flashpoint processing: {flashpoint_result['successful']} successful")
 
 # Run the examples
