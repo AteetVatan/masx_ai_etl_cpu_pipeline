@@ -383,39 +383,3 @@ class ProxyService:
         }
 
 
-# Convenience function for getting proxy service instance
-def get_proxy_service() -> ProxyService:
-    """
-    Get a configured proxy service instance.
-
-    Returns:
-        ProxyService: Configured proxy service instance
-    """
-    return ProxyService()
-
-
-# Example usage and testing
-async def test_proxy_service():
-    """Test function for the proxy service."""
-    try:
-        proxy_service = ProxyService()
-
-        # Test health check
-        health = await proxy_service.health_check()
-        print(f"Health check: {health}")
-
-        # Test get proxies
-        proxies = await proxy_service.__get_proxies()
-        print(f"Retrieved {len(proxies)} proxies")
-
-        # Test start proxy (if needed)
-        # start_response = await proxy_service.ping_start_proxy()
-        # print(f"Proxy start: {start_response}")
-
-    except Exception as e:
-        print(f"Test failed: {e}")
-
-
-if __name__ == "__main__":
-    # Run test if executed directly
-    asyncio.run(test_proxy_service())

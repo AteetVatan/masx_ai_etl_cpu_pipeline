@@ -23,7 +23,7 @@ This module handles all web scraping utility operations.
 import re
 from urllib.parse import urljoin
 from typing import List
-
+from .error_patterns import ERROR_REGEX
 
 class WebScraperUtils:
     """
@@ -97,4 +97,23 @@ class WebScraperUtils:
 
         return text.strip()
     
-   
+    
+    @staticmethod
+    def find_error_pattern(text: str) -> bool:
+        """
+        Detect if the given text contains any known connection / network / timeout error patterns.
+
+        Args:
+            text (str): The HTML, log, or plain text content to analyze.
+
+        Returns:
+            bool: True if an error pattern is found, False otherwise.
+        """
+        if not text:
+            return False
+
+        # Normalize for consistent matching
+        text = text.lower()
+
+        # Search for any pattern match
+        return bool(ERROR_REGEX.search(text))

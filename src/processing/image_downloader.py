@@ -20,7 +20,9 @@ import os
 import posixpath
 import mimetypes
 import re
+import imghdr
 from urllib.parse import urlparse, urlunparse
+from src.utils import URLUtils
 
 import httpx
 from supabase import create_client, Client
@@ -99,22 +101,23 @@ class ImageDownloader:
         
         urls = [self._clean_image_url(url) for url in urls]
         
-        #urls = urls[:1] # for testing
-        
         
         if not urls:
             logger.info("No images on ExtractResult; nothing to download.")
             return extracted_data
 
         extract_id = getattr(extracted_data, "id", "unknown")
-        prefix = f"{date}/{flashpoint_id.strip()}"
+        path = f"{date}/{flashpoint_id.strip()}"
         sem = asyncio.Semaphore(self.max_concurrency)
+        
+        # Clear all files in the directory
+        self._clear_directory(path)
 
         async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as session:
             tasks = []
             for i, url in enumerate(urls):
                 filename = self._build_filename(i, extract_id, url)
-                bucket_path = posixpath.join(prefix, filename)
+                bucket_path = posixpath.join(path, filename)
                 tasks.append(self._process_one(session, url, bucket_path, sem))
 
             results: List[Tuple[str, Optional[str], Optional[str]]] = await asyncio.gather(*tasks, return_exceptions=False)
@@ -146,6 +149,24 @@ class ImageDownloader:
             pass
 
         return extracted_data
+    
+    def _clear_directory(self, path: str):
+        """
+        Clear all files in a directory on Supabase.
+        """
+        try:
+            existing_files = self.storage.from_(self.bucket_name).list(path)
+            if existing_files:
+                for file_info in existing_files:
+                    if isinstance(file_info, dict) and 'name' in file_info:
+                        file_path = posixpath.join(path, file_info['name'])
+                        self.storage.from_(self.bucket_name).remove([file_path])
+                    elif isinstance(file_info, str):
+                        file_path = posixpath.join(path, file_info)
+                        self.storage.from_(self.bucket_name).remove([file_path])
+                logger.info(f"Cleared {len(existing_files)} existing files from {path}")
+        except Exception as e:
+            logger.warning(f"Could not clear existing files from {path}: {e}")
 
     # ----------------- internal helpers -----------------
 
@@ -178,6 +199,20 @@ class ImageDownloader:
                 data, content_type = await self._download_bytes(session, url, content_type_hint=content_type)
                 if data is None:
                     return (url, None, None)
+                
+                
+                # --- Validate MIME and actual image bytes ---
+                # Quick MIME filter
+                if not content_type or "image" not in content_type.lower():
+                    logger.warning(f"Skip {url}: not an image MIME ({content_type})")
+                    return (url, None, None)
+                
+                # Magic header test
+                if not imghdr.what(None, h=data[:32]):
+                    logger.warning(f"Skip {url}: invalid image header")
+                    return (url, None, None)
+                
+                
 
                 if len(data) > self.max_file_size:
                     logger.warning(f"Skip {url}: downloaded size {len(data)} > {self.max_file_size}")
@@ -204,11 +239,12 @@ class ImageDownloader:
         session: httpx.AsyncClient,
         url: str,
         content_type_hint: Optional[str] = None,
+        timeout: float = 15.0,
     ) -> Tuple[Optional[bytes], str]:
         """
         GET the image safely. Returns (bytes or None, content_type).
         """
-        r = await session.get(url)
+        r = await session.get(url, timeout=timeout)
         r.raise_for_status()
 
         content_type = r.headers.get("content-type") or content_type_hint or self._guess_mime_from_url(url) or "application/octet-stream"
@@ -261,6 +297,7 @@ class ImageDownloader:
         """
         ext = self._guess_ext(url)
         safe_extract = "".join(ch for ch in str(extract_id) if ch.isalnum())[:32] or "x"
+        safe_extract += URLUtils.generate_unique_code(url)
         return f"img_{index}_{safe_extract}{ext}"
 
     def _guess_ext(self, url: str) -> str:

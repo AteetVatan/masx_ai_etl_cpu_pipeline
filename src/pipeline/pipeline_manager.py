@@ -93,12 +93,6 @@ class PipelineManager:
         errors = []
         extracted_data: ExtractResult = None
         try:
-            
-            # test = 'Negacionismo parlamentar põe no lixo 44 anos da política ambiental brasileira e PL da Devastação abre brecha à criação de "vales da morte" de Norte a Sul. Entrevista especial com Suely Araújo'
-            # #test = 'Negacionismo parlamentar põe no lixo 44 anos da'
-            # test_res = await self.translation_manager.translate(test, target="en")
-            # logger.info(f"Translation: {test_res}")
-           
             extracted_data = ExtractResult()
             extracted_data.id = article_id
             extracted_data.parent_id = flashpoint_id
@@ -447,21 +441,6 @@ class PipelineManager:
             
             
   
-    
-    # async def _scrape_article(self, url: str) -> Dict[str, Any]:
-    #     """Scrape article content with fallback."""
-    #     try:
-    #         # Try primary scraper first
-    #         return await scraper.scrape_article(url)
-    #     except ScrapingError as e:
-    #         logger.warning(f"Primary scraper failed for {url}: {e}")
-            
-    #         # Try fallback scraper
-    #         try:
-    #             return await fallback_scraper.scrape_article(url)
-    #         except Exception as fallback_error:
-    #             logger.error(f"Fallback scraper also failed for {url}: {fallback_error}")
-    #             raise ScrapingError(f"Both scrapers failed: {e}, {fallback_error}")
     
     async def _clean_text(self, scraped_data: Dict[str, Any]) -> Dict[str, Any]:
         """Clean and normalize text content."""

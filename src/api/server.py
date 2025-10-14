@@ -9,7 +9,7 @@ from typing import Dict, Any
 from datetime import datetime
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
@@ -115,7 +115,43 @@ async def lifespan(app: FastAPI):
         
         logger.info("Server shutdown completed")
 
+async def verify_api_key(request: Request):
+    """
+    Verify API key from request headers.
 
+    Args:
+        request: FastAPI request object
+
+    Returns:
+        bool: True if API key is valid
+
+    Raises:
+        HTTPException: If API key is missing or invalid
+    """
+    settings = get_settings()
+
+    # Skip verification if not required
+    if not settings.require_api_key:
+        return True
+
+    # Get API key from headers
+    api_key = request.headers.get("X-API-Key") or request.headers.get("Authorization")
+
+    if not api_key:
+        raise HTTPException(
+            status_code=401,
+            detail="API key required. Please provide X-API-Key or Authorization header",
+        )
+
+    # Remove 'Bearer ' prefix if present
+    if api_key.startswith("Bearer "):
+        api_key = api_key[7:]
+
+    # Verify against configured API key
+    if api_key != settings.api_key:
+        raise HTTPException(status_code=401, detail="Invalid API key")
+
+    return True
 # Create FastAPI application
 app = FastAPI(
     title="MASX AI ETL CPU Pipeline",
@@ -123,6 +159,7 @@ app = FastAPI(
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    dependencies=[Depends(verify_api_key)],
     lifespan=lifespan
 )
 
@@ -470,18 +507,3 @@ async def global_exception_handler(request, exc):
     )
 
 
-# Main application entry point
-def main():
-    """Main application entry point."""
-    uvicorn.run(
-        "src.api.server:app",
-        host=settings.host,
-        port=settings.port,
-        reload=settings.debug,
-        log_level=settings.log_level.lower(),
-        access_log=True
-    )
-
-
-if __name__ == "__main__":
-    main()

@@ -163,6 +163,8 @@ class TrafilaturaExtractor:
 
             # Normalize fields
             content = (data.get("text") or "").strip()
+            if WebScraperUtils.find_error_pattern(content):
+                content = "error_pattern_found"
             
             # we will scrap not only content
             # but imgeas , title, author, published_date, metadata

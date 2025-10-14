@@ -5,20 +5,14 @@ import httpx
 
 ABS_URL = re.compile(r"https?://[^\s<>'\"()]+", re.IGNORECASE)
 
-def _deep_unquote(s: str, rounds: int = 6) -> str:
-    for _ in range(rounds):
-        s2 = unquote(s)
-        if s2 == s:
-            break
-        s = s2
-    return s
 
 def get_final_url(url_like: str, timeout: float = 20.0) -> str:
     """
     Returns the final URL after following redirects.
     Works even if `url_like` is a Google/Bing/DDG/search wrapper or percent-encoded.
     """
-    s = _deep_unquote(url_like.strip().strip("'\""))
+    # Simple URL unquoting (replacing the removed _deep_unquote function)
+    s = unquote(url_like.strip().strip("'\""))
     m = ABS_URL.search(s)
     if not m:
         return url_like.strip()

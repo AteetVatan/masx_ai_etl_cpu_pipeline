@@ -202,7 +202,9 @@ class Crawl4AIExtractor:
          
             scrap_result: ExtractResult = await self.trafilatura_from_html(result.cleaned_html, url)            
             images = WebScraperUtils.extract_image_urls(scrap_result.content)
-            scrap_result.images = images            
+            scrap_result.images = images
+            if WebScraperUtils.find_error_pattern(scrap_result.content):
+                scrap_result.content = "error_pattern_found"            
             cleaned = WebScraperUtils.remove_ui_junk(scrap_result.content)
             
             scrap_result.content = cleaned
@@ -247,8 +249,11 @@ class Crawl4AIExtractor:
             
                 scrap_result: ExtractResult = await self.trafilatura_from_html(result.cleaned_html, url)
                 #images = WebScraperUtils.extract_image_urls(scrap_result.content)
-                #scrap_result.images = images            
+                #scrap_result.images = images
+                if WebScraperUtils.find_error_pattern(scrap_result.content):
+                    scrap_result.content = "error_pattern_found"
                 cleaned = WebScraperUtils.remove_ui_junk(scrap_result.content)
+                
                 
                 scrap_result.content = cleaned
                 word_count=len(cleaned.split())

@@ -19,8 +19,7 @@ class Settings(BaseSettings):
     #supabase_anon_key: str = Field(..., description="Supabase anon key")
     #supabase_service_role_key: str = Field(..., description="Supabase service key")
     
-        
-
+    api_key: str = Field(default="", description="API key")
     
     # Database Configuration (Supabase)
     supabase_url: str = Field(default="", description="Supabase project URL")

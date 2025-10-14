@@ -329,5 +329,3 @@ class EntityTagger:
 
 # Singleton and module-level API
 entity_tagger = EntityTagger()
-def extract_entities(text: str) -> EntityModel:
-    return entity_tagger.extract_entities(text)

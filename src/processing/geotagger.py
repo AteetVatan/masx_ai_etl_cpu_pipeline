@@ -255,6 +255,3 @@ class Geotagger:
 # Global singleton
 geotagger = Geotagger()
 
-# Module-level entry point (exact name requested)
-def extract_geographic_entities(text: str) -> Dict[str, Any]:
-    return geotagger.extract_geographic_entities(text)
