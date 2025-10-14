@@ -101,7 +101,7 @@ class FeedProcessor:
                 "timestamp": datetime.utcnow().isoformat()
             }
     
-    async def process_feed_entries(self) -> Dict[str, Any]:
+    async def process_all_feed_entries(self, batch_mode: bool = False) -> Dict[str, Any]:
         """
         Process all feed entries for a specific date.
         
@@ -117,7 +117,6 @@ class FeedProcessor:
        
         
         try:
-
             
             logger.info(f"Processing feed entries for date: {self.date}")
             
@@ -137,7 +136,16 @@ class FeedProcessor:
                 }
             
             # Process all entries
-            results = await self._process_feed_entries(feed_entries)
+            results = {
+                "successful": 0,
+                "failed": 0,
+                "processing_time": 0
+            }
+            
+            if batch_mode:
+                results = await self._process_feed_entries_batch(feed_entries)
+            else:
+                results = await self._process_feed_entries(feed_entries)
             
             # Update statistics
             self.processing_stats["total_processed"] += len(feed_entries)
@@ -294,7 +302,86 @@ class FeedProcessor:
             "successful": successful,
             "failed": failed,
             "processing_time": processing_time
-        }    
+        }
+        
+    async def _process_feed_entries_batch(self, feed_entries: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Process a list of feed entries through the pipeline in batch mode."""
+        
+        logger.info(f"Starting batch processing for {len(feed_entries)} articles")
+        
+        start_time = datetime.utcnow()
+        successful = 0
+        failed = 0
+        
+        try:
+            # Convert all feed entries to article format for batch processing
+            article_data_list = []
+            for feed_entry in feed_entries:
+                try:
+                    article_data: FeedModel = FeedModel.from_feed_entry(feed_entry)
+                    article_data_list.append(article_data)
+                except Exception as e:
+                    failed += 1
+                    logger.error(f"Error converting feed entry {feed_entry.get('url', 'unknown')}: {e}")
+            
+            if not article_data_list:
+                logger.warning("No valid article data to process")
+                return {
+                    "successful": 0,
+                    "failed": len(feed_entries),
+                    "processing_time": (datetime.utcnow() - start_time).total_seconds()
+                }
+                
+            article_data_list = article_data_list[:3]
+            
+            # Process articles in batch
+            data_results = await pipeline_manager.process_batch(article_data_list, self.date)
+            
+            if data_results["status"] == "completed":
+                results = data_results["results"]
+                
+                # Process results and save to database
+                for i, result in enumerate(results):
+                    try:
+                        if result["status"] == "completed":
+                            # Save processed article to database
+                            enriched_data: FeedModel = result["enriched_data"]
+                            save_success = await db_connection.update_processed_article(enriched_data)
+                            
+                            if save_success:
+                                successful += 1
+                                logger.debug(f"Successfully processed and saved article: {enriched_data.url}")
+                            else:
+                                failed += 1
+                                logger.warning(f"Failed to save processed article: {enriched_data.url}")
+                        else:
+                            failed += 1
+                            logger.warning(f"Failed to process article: {article_data_list[i].url} - {result.get('errors', [])}")
+                            
+                    except Exception as e:
+                        failed += 1
+                        logger.error(f"Error saving processed article {article_data_list[i].url}: {e}")
+            else:
+                # If batch processing failed, mark all as failed
+                failed = len(article_data_list)
+                logger.error(f"Batch processing failed: {data_results.get('error', 'Unknown error')}")
+                        
+        except Exception as e:
+            # If there's a critical error, mark all remaining as failed
+            remaining_failed = len(feed_entries) - successful - failed
+            failed += remaining_failed
+            logger.error(f"Critical error during batch processing: {e}")
+        
+        processing_time = (datetime.utcnow() - start_time).total_seconds()
+        
+        logger.info(f"Batch processing completed: {successful} successful, {failed} failed in {processing_time:.2f}s")
+        
+        return {
+            "successful": successful,
+            "failed": failed,
+            "processing_time": processing_time
+        }
+                
 
     def get_processing_stats(self) -> Dict[str, Any]:
         """Get processing statistics."""

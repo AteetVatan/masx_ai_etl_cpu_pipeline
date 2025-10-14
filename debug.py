@@ -51,13 +51,13 @@ async def warmup_server(date: str) -> None:
         raise
 
 
-async def process_feed_entries_by_date(date: str) -> None:
+async def process_feed_entries_by_date(date: str, batch_mode: bool = False) -> None:
     """Process all feed entries for a specific date."""
     logger.info(f"Processing feed entries for date: {date}")
     
     try:
         feed_processor.set_date(date)
-        result = await feed_processor.process_feed_entries()
+        result = await feed_processor.process_all_feed_entries(batch_mode)
         logger.info(f"Processing completed: {result}")
     except Exception as e:
         logger.error(f"Processing failed: {e}")
@@ -141,13 +141,12 @@ async def main(date: Optional[str] = None, flashpoint_id: Optional[str] = None):
         
         #test warmup
         await warmup_server(date)
+        
+        #here i want to 
+        await process_feed_entries_by_date(date, batch_mode=True)
             
         #test process
-        await process_feed_entries_by_date(date)
-        
-       
-            
-        return    
+        #await process_feed_entries_by_date(date)            
             
         #test process-flashpoint
         await process_feed_entries_by_flashpoint_id(date, flashpoint_id)

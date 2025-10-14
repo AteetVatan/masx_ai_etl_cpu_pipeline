@@ -5,10 +5,13 @@ Uses DuckDuckGo image search with quality filtering
 for finding relevant images for articles.
 """
 
+import os
 from typing import List, Dict, Any, Optional
+from random import choice
 import httpx
 import pycountry
 from ddgs import DDGS
+from ddgs.exceptions import DDGSException
 from babel.core import get_global
 
 from src.config import get_settings, get_service_logger
@@ -33,18 +36,66 @@ class ImageFinder:
         self.max_width = 4000
         self.max_height = 4000
         self.max_file_size = 5 * 1024 * 1024  # 5MB
-        self.ddgs = DDGS()
+        self.ddgs = None
 
         # Supported image formats
         self.supported_formats = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 
         logger.info("DuckDuckGo ImageFinder initialized")
+    
+    async def test_duckduckgo(self):
+        """Test DuckDuckGo image search."""
+        try:
+            results = await self.ddgs.images("brazil", max_results=5, backend="lite")
+            return results
+        except Exception as e:
+            logger.error(f"DuckDuckGo test failed: {e}")
+            return None
 
-    async def find_images(
+    async def get_images_from_duckduckgo(
         self,
         query: str,
         max_images: int = 5,
-        duckduckgo_region: str = "en-us"
+        proxies: list[str] | None = None,
+        duckduckgo_region: str = "us-en",
+        ) -> List[Dict[str, Any]] | None:
+        # Remove proxy env vars
+        for var in ("HTTP_PROXY","HTTPS_PROXY","ALL_PROXY","http_proxy","https_proxy","all_proxy"):
+            os.environ.pop(var, None)            
+            
+        try: 
+            client = httpx.Client(http2=False, verify=True) 
+            with DDGS(proxy=None, timeout=20, verify=True) as ddgs:
+                results = ddgs.images(query, max_results=max_images, region=duckduckgo_region)                
+                return results 
+        except Exception as e: 
+            pass
+        
+        proxy=None
+        if proxies: 
+            proxy = choice(proxies) 
+            proxy = f"http://{proxy}"
+            
+        if proxy:
+            try: 
+                client = httpx.Client(http2=False, verify=True) 
+                with DDGS(proxy=proxy, timeout=20, verify=True) as ddgs:                    
+                    results = ddgs.images(query, max_results=max_images, region=duckduckgo_region)
+                    return results 
+            except Exception as e: 
+                pass
+            
+
+        
+        return None
+        
+
+    async def find_images(
+        self,
+        query: str,        
+        max_images: int = 5,
+        duckduckgo_region: str = None, #"en-us",
+        proxies: list[str] = None
     ) -> Dict[str, Any]:
         """
         Find relevant images for a given query using DuckDuckGo.
@@ -68,13 +119,20 @@ class ImageFinder:
 
         #logger.info(f"Searching DuckDuckGo for images with query: {query}")
 
-        try:            
-            results = self.ddgs.images(query, max_results=max_images,
-                                       region=duckduckgo_region)
-
+        try:
             images: List[str] = []
             images_data_set: List[Dict[str, Any]] = []
-
+            results = await self.get_images_from_duckduckgo(query, max_images, proxies, duckduckgo_region)
+            if not results: 
+                return {
+                "images": [],
+                "total_found": 0,
+                "images_data": [],
+                "search_method": "duckduckgo_error",
+                "query": query,
+                "duckduckgo_region": duckduckgo_region,
+            }           
+   
             for item in results:
                 image_data = self._process_duckduckgo_image(item)                
                 if image_data and self._is_high_quality_image(image_data):
@@ -88,6 +146,16 @@ class ImageFinder:
                 "total_found": len(images),
                 "images_data": images_data_set,
                 "search_method": "duckduckgo",
+                "query": query,
+                "duckduckgo_region": duckduckgo_region,
+            }
+        except DDGSException as e:
+            logger.error(f"DuckDuckGo: {e}")
+            return {
+                "images": [],
+                "total_found": 0,
+                "images_data": [],
+                "search_method": "duckduckgo_error",
                 "query": query,
                 "duckduckgo_region": duckduckgo_region,
             }
@@ -269,12 +337,13 @@ class ImageFinder:
                 codes.add(code)
            
 
-        # 3) lang + regions inferred from Babel        
-        regions = self._regions_for_language(lang)
-        for region in regions:
-            code = self._to_duckduckgo_region(lang, region)
-            if code:
-                codes.add(code)
+        # 3) lang + regions inferred from Babel
+        if lang != "en":        
+            regions = self._regions_for_language(lang)
+            for region in regions:
+                code = self._to_duckduckgo_region(lang, region)
+                if code:
+                    codes.add(code)
 
         # 4) English + given region
         if country:

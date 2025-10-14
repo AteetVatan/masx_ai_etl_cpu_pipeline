@@ -22,15 +22,43 @@ This module handles all web scraping utility operations.
 
 import re
 from urllib.parse import urljoin
+from typing import List
 
 
 class WebScraperUtils:
     """
     This class handles all web scraping utility operations.
     """
+    
+    @staticmethod
+    def extract_image_urls(text: str) -> List[str]:
+        """
+        Extract image URLs (Markdown, HTML, or plain URLs) from text.
+
+        Returns:
+            A list of image URLs found in the text.
+        """
+        if not text:
+            return []
+
+        urls = set()
+
+        # Markdown images: ![alt](url)
+        urls.update(re.findall(r'!\[.*?\]\((https?://[^\s)]+)\)', text))
+
+        # HTML image tags: <img src="url">
+        urls.update(re.findall(r'<img[^>]+src=["\'](https?://[^"\']+)["\']', text))
+
+        # Direct image links (ending in jpg/png/gif/webp/jpeg)
+        urls.update(re.findall(r'(https?://[^\s]+?\.(?:jpg|jpeg|png|gif|webp))', text, re.IGNORECASE))
+
+        # Relative or local paths (optional, depending on your input data)
+        urls.update(re.findall(r'src=["\']([^"\']+\.(?:jpg|jpeg|png|gif|webp))["\']', text, re.IGNORECASE))
+
+        return list(urls)
 
     @staticmethod
-    def remove_links_images_ui_junk(text: str) -> str:
+    def remove_ui_junk(text: str) -> str:
         # Step 0: Normalize invisible characters
         text = text.replace("\u200b", "")  # Zero-width space
 

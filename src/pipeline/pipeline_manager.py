@@ -7,6 +7,7 @@ error handling, and batch operations for high-performance processing.
 
 import asyncio
 import time
+import os
 from typing import Dict, Any, List, Optional, Tuple
 import random
 from datetime import datetime
@@ -103,7 +104,7 @@ class PipelineManager:
             extracted_data.parent_id = flashpoint_id
             extracted_data.url = url
             extracted_data.title = title
-            extracted_data.images = [original_image]
+            extracted_data.images = []
             extracted_data.article_source_country = article_data.source_country
             
             
@@ -117,7 +118,7 @@ class PipelineManager:
             extracted_data = await self._set_extracted_language(extracted_data)
             processing_steps.append("language_setting")            
             
-            # Step 3: Translate title 
+            # Step 3: Translate title
             logger.debug(f"Step 3: Translating title and language detection for article {article_id}")
             extracted_data = await self._translate_title(extracted_data)
             processing_steps.append("translation")
@@ -140,10 +141,11 @@ class PipelineManager:
             
             
             # Step 7: download images to supabase
-            logger.debug(f"Step 7: Downloading images to supabase for article {article_id}")
-            extracted_data = await self._download_images(date, flashpoint_id, extracted_data)
-            processing_steps.append("image_download")
-   
+            if len(extracted_data.images) > 0:
+                logger.debug(f"Step 7: Downloading images to supabase for article {article_id}")
+                extracted_data = await self._download_images(date, flashpoint_id, extracted_data)
+                processing_steps.append("image_download")
+    
             
             #here update the article data with the extracted data
             article_data.title = extracted_data.title
@@ -198,105 +200,205 @@ class PipelineManager:
                 "timestamp": datetime.utcnow().isoformat()
             }
     
-    async def process_batch(self, article_ids: List[str], date: str) -> Dict[str, Any]:
+    async def process_batch(self, article_data_list: List[FeedModel], date: str) -> Dict[str, Any]:
         """
-        Process a batch of articles in parallel.
+        Process a batch of articles in parallel with intelligent batching.
+        
+        Creates CPU-optimized sub-batches and processes them sequentially to avoid
+        overwhelming the system while maintaining high throughput.
         
         Args:
-            article_ids: List of article IDs to process
+            article_data_list: List of article data to process
+            date: Processing date
             
         Returns:
             Dictionary containing batch processing results
         """
-        logger.info(f"Starting batch processing for {len(article_ids)} articles")
+        logger.info(f"Starting intelligent batch processing for {len(article_data_list)} articles")
         
         start_time = time.time()
-        results = []
-        successful = 0
-        failed = 0
+        all_results = []
+        total_successful = 0
+        total_failed = 0
         
         try:
-            # Fetch articles from database
-            articles = await self._fetch_articles_batch(article_ids)
+            # Calculate optimal batch size based on CPU cores and available workers
+            optimal_batch_size = self._calculate_optimal_batch_size(len(article_data_list))
+            logger.info(f"Using batch size of {optimal_batch_size} articles per sub-batch")
             
-            if not articles:
-                logger.warning("No articles found for batch processing")
-                return {
-                    "status": "completed",
-                    "total_articles": len(article_ids),
-                    "processed": 0,
-                    "successful": 0,
-                    "failed": 0,
-                    "processing_time": time.time() - start_time,
-                    "results": []
-                }
+            # Split articles into optimal sub-batches
+            sub_batches = self._create_sub_batches(article_data_list, optimal_batch_size)
+            logger.info(f"Created {len(sub_batches)} sub-batches for processing")
             
-            # Process articles in parallel using thread pool
-            tasks = []
-            for article in articles:
-                task = thread_pool.submit_task(
-                    self.process_article,
-                    article,
-                    date
-                )
-                tasks.append(task)
+            # Process each sub-batch sequentially to avoid resource contention
+            for batch_idx, sub_batch in enumerate(sub_batches, 1):
+                logger.info(f"Processing sub-batch {batch_idx}/{len(sub_batches)} with {len(sub_batch)} articles")
+                
+                batch_start_time = time.time()
+                batch_results = await self._process_sub_batch(sub_batch, date, batch_idx)
+                
+                # Aggregate results
+                all_results.extend(batch_results["results"])
+                total_successful += batch_results["successful"]
+                total_failed += batch_results["failed"]
+                
+                batch_time = time.time() - batch_start_time
+                logger.info(f"Sub-batch {batch_idx} completed: {batch_results['successful']} successful, "
+                           f"{batch_results['failed']} failed in {batch_time:.2f}s")
+                
+                # Small delay between batches to prevent resource exhaustion
+                if batch_idx < len(sub_batches):
+                    await asyncio.sleep(0.1)
             
-            # Wait for all tasks to complete
-            for task in tasks:
-                try:
-                    result = await asyncio.wrap_future(task)
-                    results.append(result)
-                    
-                    if result["status"] == "completed":
-                        successful += 1
-                    else:
-                        failed += 1
-                        
-                except Exception as e:
-                    logger.error(f"Task failed: {e}")
-                    failed += 1
-                    results.append({
-                        "article_id": "unknown",
-                        "status": "failed",
-                        "processing_time": 0,
-                        "processing_steps": [],
-                        "enriched_data": None,
-                        "errors": [str(e)],
-                        "timestamp": datetime.utcnow().isoformat()
-                    })
-                    
-                    
-            #enriched_data is the article_data with the extracted data
+            total_processing_time = time.time() - start_time
             
-            # Update database with results
-            await self._update_articles_batch(results)
-            
-            processing_time = time.time() - start_time
-            
-            logger.info(f"Batch processing completed: {successful} successful, {failed} failed in {processing_time:.2f}s")
+            logger.info(f"Batch processing completed: {total_successful} successful, "
+                       f"{total_failed} failed in {total_processing_time:.2f}s")
             
             return {
                 "status": "completed",
-                "total_articles": len(article_ids),
-                "processed": len(results),
-                "successful": successful,
-                "failed": failed,
-                "processing_time": processing_time,
-                "results": results
+                "total_articles": len(article_data_list),
+                "processed": len(all_results),
+                "successful": total_successful,
+                "failed": total_failed,
+                "processing_time": total_processing_time,
+                "sub_batches_processed": len(sub_batches),
+                "optimal_batch_size": optimal_batch_size,
+                "results": all_results
             }
             
         except Exception as e:
             logger.error(f"Batch processing failed: {e}")
             return {
                 "status": "failed",
-                "total_articles": len(article_ids),
-                "processed": len(results),
-                "successful": successful,
-                "failed": failed,
+                "total_articles": len(article_data_list),
+                "processed": len(all_results),
+                "successful": total_successful,
+                "failed": total_failed,
                 "processing_time": time.time() - start_time,
                 "error": str(e),
-                "results": results
+                "results": all_results
             }
+    
+    def _calculate_optimal_batch_size(self, total_articles: int) -> int:
+        """
+        Calculate optimal batch size based on system resources and article count.
+        
+        Args:
+            total_articles: Total number of articles to process
+            
+        Returns:
+            Optimal batch size for processing
+        """
+        # Base batch size on available CPU cores and thread pool capacity
+        cpu_cores = os.cpu_count() or 4
+        max_workers = self.max_workers
+        
+        # Calculate base batch size (2-3x the number of workers for good throughput)
+        base_batch_size = max_workers * 2
+        
+        # Adjust based on total articles
+        if total_articles <= 10:
+            return min(total_articles, 5)  # Small batches for small workloads
+        elif total_articles <= 50:
+            return min(base_batch_size, total_articles)
+        elif total_articles <= 200:
+            return min(base_batch_size * 2, total_articles)
+        else:
+            # For large workloads, use larger batches but cap at reasonable size
+            return min(base_batch_size * 3, 100)
+    
+    def _create_sub_batches(self, article_data_list: List[FeedModel], batch_size: int) -> List[List[FeedModel]]:
+        """
+        Split article list into sub-batches of optimal size.
+        
+        Args:
+            article_data_list: List of articles to split
+            batch_size: Size of each sub-batch
+            
+        Returns:
+            List of sub-batches
+        """
+        sub_batches = []
+        for i in range(0, len(article_data_list), batch_size):
+            sub_batch = article_data_list[i:i + batch_size]
+            sub_batches.append(sub_batch)
+        return sub_batches
+    
+    async def _process_sub_batch(self, sub_batch: List[FeedModel], date: str, batch_idx: int) -> Dict[str, Any]:
+        """
+        Process a single sub-batch of articles in parallel using asyncio.
+        
+        Args:
+            sub_batch: List of articles in this sub-batch
+            date: Processing date
+            batch_idx: Index of this sub-batch for logging
+            
+        Returns:
+            Dictionary containing sub-batch processing results
+        """
+        results = []
+        successful = 0
+        failed = 0
+        
+        # Create asyncio tasks for all articles in this sub-batch
+        tasks = []
+        for article_data in sub_batch:
+            task = asyncio.create_task(
+                self.process_article(article_data, date),
+                name=f"article_{article_data.id}"
+            )
+            tasks.append(task)
+        
+        # Wait for all tasks in this sub-batch to complete
+        try:
+            # Use asyncio.gather to wait for all tasks with return_exceptions=True
+            # to handle individual task failures gracefully
+            task_results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            for i, result in enumerate(task_results):
+                if isinstance(result, Exception):
+                    # Handle task exceptions
+                    logger.error(f"Task failed in sub-batch {batch_idx}: {result}")
+                    failed += 1
+                    results.append({
+                        "article_id": sub_batch[i].id if i < len(sub_batch) else "unknown",
+                        "status": "failed",
+                        "processing_time": 0,
+                        "processing_steps": [],
+                        "enriched_data": None,
+                        "errors": [str(result)],
+                        "timestamp": datetime.utcnow().isoformat()
+                    })
+                else:
+                    # Handle successful results
+                    results.append(result)
+                    if result["status"] == "completed":
+                        successful += 1
+                    else:
+                        failed += 1
+                        
+        except Exception as e:
+            # Handle any unexpected errors in the gather operation
+            logger.error(f"Unexpected error in sub-batch {batch_idx}: {e}")
+            # Mark all remaining tasks as failed
+            for i in range(len(results), len(sub_batch)):
+                failed += 1
+                results.append({
+                    "article_id": sub_batch[i].id if i < len(sub_batch) else "unknown",
+                    "status": "failed",
+                    "processing_time": 0,
+                    "processing_steps": [],
+                    "enriched_data": None,
+                    "errors": [str(e)],
+                    "timestamp": datetime.utcnow().isoformat()
+                })
+        
+        return {
+            "successful": successful,
+            "failed": failed,
+            "results": results
+        }
     
     async def _scrape_article(self, extracted_data: ExtractResult) -> ExtractResult:
         """Scrape article content with fallback."""
@@ -435,38 +537,41 @@ class PipelineManager:
             else:
                 country = None
             
-            regions =  self.image_finder.get_all_duckduckgo_regions(language, country)
-            
+            regions =  self.image_finder.get_all_duckduckgo_regions(language, country)           
             images = set()
             #images_data_set = list()
+            proxies = await self.proxy_service.get_proxy_cache()
             
             for region in regions:
-            
+                
                 if extracted_data.title:
-                    try:            
+                    try:
+                                    
                         images_data = await self.image_finder.find_images(extracted_data.title, 
-                                                                    max_images=10, 
-                                                                    duckduckgo_region=region)
+                                                                    max_images=10,
+                                                                    proxies=proxies, duckduckgo_region=region)
                         if images_data.get("images"):
+                            
+                            
+                            
                             images.update(images_data.get("images"))
                             #images_data_set.extend(images_data.get("images_data"))
                     except Exception as e:
                         logger.warning(f"Image search failed for title '{extracted_data.title}': {e}")
-                        continue
+                        
                     
                     
-            if len(images) < 3 and extracted_data.title_en:               
-                for region in regions:                
+                if len(images) < 3 and extracted_data.language != "en" and extracted_data.title_en:
                     if extracted_data.title_en:
                         try:
                             images_data = await self.image_finder.find_images(extracted_data.title_en, 
-                                                                        max_images=5, 
-                                                                        duckduckgo_region=region)
+                                                                        max_images=10,
+                                                                        proxies=proxies, duckduckgo_region=region)
                             if images_data.get("images"):
                                 images.extend(images_data.get("images"))
                         except Exception as e:
                             logger.warning(f"Image search failed for title_en '{extracted_data.title_en}': {e}")
-                            continue
+                        
                     
                 
             # if len(images) < 3:

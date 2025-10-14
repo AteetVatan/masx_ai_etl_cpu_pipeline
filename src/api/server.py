@@ -305,7 +305,7 @@ async def process_feed_entries(
         
         # Process feed entries
         feed_processor.set_date(validated_date)
-        result = await feed_processor.process_feed_entries()
+        result = await feed_processor.process_all_feed_entries()
         
         return FeedProcessResponse(**result)
         

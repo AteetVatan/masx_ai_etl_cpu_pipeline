@@ -97,7 +97,7 @@ class NewsContentExtractor:
 
             # Step 1: Try trafilatura extraction           
 
- 
+             
             try:
                 trafilatura_extractor = get_trafilatura_extractor()
                 proxy = choice(proxies)

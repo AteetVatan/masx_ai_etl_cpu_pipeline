@@ -56,9 +56,14 @@ class Crawl4AIExtractor:
             min_word_threshold=25,  # Increase threshold to focus on denser blocks
         )
 
+        # md_generator = DefaultMarkdownGenerator(
+        #     content_filter=prune_filter,
+        #     options={"ignore_links": True, "ignore_images": True, "escape_html": True},
+        # )
+        
         md_generator = DefaultMarkdownGenerator(
             content_filter=prune_filter,
-            options={"ignore_links": True, "ignore_images": True, "escape_html": True},
+            options={"ignore_links": True, "escape_html": True},
         )
 
         c4a_script = """# Give banners time to render
@@ -195,8 +200,10 @@ class Crawl4AIExtractor:
                     f"Crawl failed with error: {result.error_message or 'unknown error'}"
                 )
          
-            scrap_result: ExtractResult = await self.trafilatura_from_html(result.cleaned_html, url)
-            cleaned = WebScraperUtils.remove_links_images_ui_junk(scrap_result.content)
+            scrap_result: ExtractResult = await self.trafilatura_from_html(result.cleaned_html, url)            
+            images = WebScraperUtils.extract_image_urls(scrap_result.content)
+            scrap_result.images = images            
+            cleaned = WebScraperUtils.remove_ui_junk(scrap_result.content)
             
             scrap_result.content = cleaned
             word_count=len(cleaned.split())
@@ -239,7 +246,9 @@ class Crawl4AIExtractor:
                     )
             
                 scrap_result: ExtractResult = await self.trafilatura_from_html(result.cleaned_html, url)
-                cleaned = WebScraperUtils.remove_links_images_ui_junk(scrap_result.content)
+                #images = WebScraperUtils.extract_image_urls(scrap_result.content)
+                #scrap_result.images = images            
+                cleaned = WebScraperUtils.remove_ui_junk(scrap_result.content)
                 
                 scrap_result.content = cleaned
                 word_count=len(cleaned.split())
