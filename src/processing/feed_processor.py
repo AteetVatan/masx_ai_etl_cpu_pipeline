@@ -145,7 +145,7 @@ class FeedProcessor:
 
             proxy_service = ProxyService.get_instance()
             await proxy_service.start_proxy_refresher()
-            #proxies = await proxy_service.get_proxy_cache()
+            proxies = await proxy_service.get_proxy_cache()
             
             
             if batch_mode:
