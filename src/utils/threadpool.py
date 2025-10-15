@@ -182,13 +182,13 @@ class DynamicThreadPool:
             self._start_time = datetime.now()
             logger.info(f"Started thread pool with {self.current_workers} workers")
     
-    def shutdown(self, wait: bool = True, timeout: Optional[float] = None) -> None:
+    def shutdown(self, wait: bool = True, timeout: Optional[float] = 30.0) -> None:
         """
         Shutdown the thread pool gracefully.
         
         Args:
             wait: Whether to wait for running tasks to complete
-            timeout: Maximum time to wait for shutdown
+            timeout: Maximum time to wait for shutdown (default: 30 seconds)
         """
         self._shutdown_event.set()
         

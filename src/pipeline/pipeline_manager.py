@@ -16,7 +16,6 @@ from datetime import datetime
 from src.db import db_connection, DatabaseError
 from src.processing import NewsContentExtractor,EntityTagger, TextCleaner, Geotagger, ImageFinder, ImageDownloader
 from src.services import ProxyService, TranslationManager
-from src.utils.threadpool import thread_pool
 from src.config import get_service_logger, get_settings
 from src.models import FeedModel, ExtractResult, EntityModel, EntityAttributes, GeoEntity
 from src.utils import NlpUtils, LanguageUtils
@@ -65,8 +64,6 @@ class PipelineManager:
             "last_activity": None
         }
         
-        # Initialize thread pool
-        thread_pool.start()
         
         logger.info("Pipeline manager initialized")
     
@@ -522,6 +519,8 @@ class PipelineManager:
             proxies = await self.proxy_service.get_proxy_cache()
             
             for region in regions:
+                if len(images) >= 5:
+                    break # 5 images are enough
                 
                 if extracted_data.title:
                     try:
@@ -648,11 +647,8 @@ class PipelineManager:
     
     async def get_pipeline_stats(self) -> Dict[str, Any]:
         """Get comprehensive pipeline statistics."""
-        thread_pool_stats = thread_pool.get_stats()
-        
         return {
             "pipeline_stats": self.stats,
-            "thread_pool_stats": thread_pool_stats,
             "database_stats": await self._get_database_stats(),
             "uptime": time.time() - (self.stats["start_time"] or time.time())
         }
@@ -676,12 +672,6 @@ class PipelineManager:
             "timestamp": datetime.utcnow().isoformat()
         }
         
-        # Check thread pool
-        thread_pool_healthy = thread_pool.is_healthy()
-        health_status["components"]["thread_pool"] = {
-            "status": "healthy" if thread_pool_healthy else "unhealthy",
-            "details": thread_pool.get_stats()
-        }
         
         # Check database connection
         try:
@@ -726,9 +716,6 @@ class PipelineManager:
     async def shutdown(self):
         """Gracefully shutdown the pipeline manager."""
         logger.info("Shutting down pipeline manager")
-        
-        # Shutdown thread pool
-        thread_pool.shutdown(wait=True, timeout=30)
         
         # Disconnect from database
         await db_connection.disconnect()

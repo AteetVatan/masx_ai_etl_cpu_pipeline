@@ -96,11 +96,9 @@ class ImageDownloader:
             logger.info("Image downloading disabled via config; skipping.")
             return extracted_data
 
-        urls: List[str] = getattr(extracted_data, "images", []) or []
+        urls: List[str] = getattr(extracted_data, "images", []) or []        
         
-        
-        urls = [self._clean_image_url(url) for url in urls]
-        
+        urls = [self._clean_image_url(url) for url in urls]        
         
         if not urls:
             logger.info("No images on ExtractResult; nothing to download.")
@@ -111,7 +109,7 @@ class ImageDownloader:
         sem = asyncio.Semaphore(self.max_concurrency)
         
         # Clear all files in the directory
-        self._clear_directory(path)
+        #self._clear_directory(path)
 
         async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as session:
             tasks = []
