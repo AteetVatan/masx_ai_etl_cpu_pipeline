@@ -31,7 +31,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 #Copy global site-packages instead of user-local
 COPY --from=builder /usr/local /usr/local
 
-# No need for PYTHONPATH anymore
+# Set PYTHONPATH to include the app directory for proper module resolution
+ENV PYTHONPATH=/app:$PYTHONPATH
 ENV PATH=/usr/local/bin:$PATH
 
 COPY . .
