@@ -231,3 +231,6 @@ Desktop.ini
 .directory
 .Trash-*
 .nfs*
+
+# local files
+third_party/
