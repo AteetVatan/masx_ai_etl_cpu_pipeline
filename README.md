@@ -1,49 +1,75 @@
 # MASX AI ETL CPU Pipeline
 
-A high-performance CPU-only news enrichment pipeline with FastAPI service layer. Processes ~100,000 articles/day with parallel processing, multilingual support, and comprehensive error handling.
+A high-performance CPU-only news enrichment pipeline with FastAPI service layer. Processes ~100,000 articles/day with **thread-safe parallel processing**, multilingual support, and comprehensive error handling.
 
 ## 🚀 Features
 
-- **High-Performance Processing**: Parallel thread processing with dynamic CPU scaling
+- **Thread-Safe Parallel Processing**: Production-ready parallel execution with no race conditions
+- **High-Performance Processing**: Dynamic CPU scaling with optimal batch distribution
 - **Multilingual Support**: Handles articles in multiple languages with language-specific processing
-- **Comprehensive Scraping**: Primary scraper with BeautifulSoup + httpx, fallback with Crawl4AI
+- **Comprehensive Scraping**: Multiple extractors (Trafilatura, Crawl4AI, BeautifulSoup) with fallback mechanisms
 - **Advanced Text Processing**: Intelligent text cleaning and normalization
 - **Geographic Entity Recognition**: Multilingual NER with spaCy and pycountry
-- **Image Search**: Multiple API support (Bing, DuckDuckGo) with quality filtering
+- **Image Search & Download**: Multiple API support (Bing, DuckDuckGo) with Supabase storage
+- **Translation Services**: Multi-provider translation with circuit breaker pattern
 - **Production-Ready API**: FastAPI with comprehensive endpoints and monitoring
-- **Database Integration**: Supabase support with batch operations
+- **Database Integration**: Supabase support with batch operations and connection pooling
 - **Docker Support**: Multi-stage Dockerfile with optimized production image
 - **Comprehensive Testing**: Full test suite with unit and integration tests
 
 ## 📁 Project Structure
 
 ```
-masx_cpu_pipeline/
+masx-ai-masx_ai_etl_cpu_pipeline/
 ├── src/
-│   ├── api/                  # FastAPI endpoints
+│   ├── api/                      # FastAPI endpoints
 │   │   └── server.py
-│   ├── config/               # Configuration & settings
-│   │   └── settings.py
-│   ├── db/                   # Supabase DB client & batch helpers
-│   │   └── db_client.py
-│   ├── scraping/             # Web scraping
-│   │   ├── scraper.py        # BeautifulSoup + httpx
-│   │   └── fallback_crawl4ai.py
-│   ├── processing/           # Text cleaning & enrichment
-│   │   ├── cleaner.py
-│   │   ├── geotagger.py      # Multilingual NER + pycountry
-│   │   └── image_finder.py   # Bing API / DuckDuckGo / CLIP
-│   ├── pipeline/             # Orchestrator
+│   ├── config/                   # Configuration & settings
+│   │   ├── settings.py
+│   │   └── logging_config.py
+│   ├── core/                     # Core exceptions
+│   │   └── exceptions.py
+│   ├── db/                       # Supabase DB client & batch helpers
+│   │   └── db_client_and_pool.py
+│   ├── models/                   # Data models
+│   │   ├── feed_models.py
+│   │   ├── extract_result.py
+│   │   ├── entity_model.py
+│   │   └── geo_entity.py
+│   ├── pipeline/                 # Main orchestrator
 │   │   └── pipeline_manager.py
-│   └── utils/                # Helpers (logging, threadpool, etc.)
-│       └── threadpool.py
-├── tests/                    # Pytest unit/integration tests
+│   ├── processing/               # Text cleaning & enrichment
+│   │   ├── news_content_extractor.py
+│   │   ├── cleaner.py
+│   │   ├── geotagger.py         # Multilingual NER + pycountry
+│   │   ├── entity_tragger.py    # Entity extraction
+│   │   ├── image_finder.py      # Bing API / DuckDuckGo
+│   │   ├── image_downloader.py  # Image download & Supabase storage
+│   │   └── feed_processor.py    # Feed processing orchestrator
+│   ├── scraping/                 # Web scraping
+│   │   ├── trafilatura_extractor.py
+│   │   ├── crawl4AI_extractor.py
+│   │   ├── beautiful_soap_extractor.py
+│   │   ├── unwrapped_url_resolver.py
+│   │   ├── web_scraper_utils.py
+│   │   └── error_patterns.py
+│   ├── services/                 # External services
+│   │   ├── translation_manager.py
+│   │   └── proxy.py
+│   └── utils/                    # Helpers
+│       ├── threadpool.py
+│       ├── nlp_utils.py
+│       ├── language_utils.py
+│       ├── url_utils.py
+│       └── date_validation.py
+├── tests/                        # Pytest unit/integration tests
+├── third_party/                  # Third-party packages
 ├── requirements.txt
+├── env.example                   # Environment configuration template
+├── run.py                        # Main application entry point
+├── debug.py                      # Debug script for testing
+├── init.sql                      # Database initialization
 ├── Dockerfile
-├── docker-compose.yml
-├── nginx.conf
-├── prometheus.yml
-├── init.sql
 └── README.md
 ```
 
@@ -59,8 +85,8 @@ masx_cpu_pipeline/
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/masx-ai/etl-cpu-pipeline.git
-   cd etl-cpu-pipeline
+   git clone https://github.com/masx-ai/masx_ai_etl_cpu_pipeline.git
+   cd masx_ai_etl_cpu_pipeline
    ```
 
 2. **Create virtual environment**
@@ -90,17 +116,11 @@ masx_cpu_pipeline/
 
 6. **Run the application**
    ```bash
-   # Option 1: Using the convenient run script
+   # Using the main entry point
    python run.py
    
-   # Option 2: Using uvicorn directly
+   # Or using uvicorn directly
    python -m uvicorn src.api.server:app --reload
-   
-   # Option 3: Using the shell script (Unix/Linux/macOS)
-   ./run.sh
-   
-   # Option 4: Using the batch file (Windows)
-   run.bat
    ```
 
 ### Docker Deployment
@@ -123,16 +143,29 @@ masx_cpu_pipeline/
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `SUPABASE_URL` | Supabase project URL | Required |
-| `SUPABASE_KEY` | Supabase anon key | Required |
-| `SUPABASE_SERVICE_KEY` | Supabase service key | Required |
+| `SUPABASE_ANON_KEY` | Supabase anon key | Required |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service key | Required |
+| `SUPABASE_IMAGE_BUCKET` | Supabase image bucket name | Required |
+| `SUPABASE_DB_PASSWORD` | Supabase database password | Required |
+| `SUPABASE_DB_URL` | Supabase database URL | Required |
 | `BING_SEARCH_API_KEY` | Bing Search API key | Optional |
 | `DUCKDUCKGO_API_KEY` | DuckDuckGo API key | Optional |
+| `PROXY_API_KEY` | Proxy service API key | Optional |
+| `PROXY_BASE` | Proxy service base URL | Optional |
 | `MAX_WORKERS` | Maximum worker threads | CPU cores × 2 |
 | `BATCH_SIZE` | Database batch size | 100 |
 | `REQUEST_TIMEOUT` | Request timeout (seconds) | 30 |
+| `RETRY_ATTEMPTS` | Number of retry attempts | 3 |
+| `RETRY_DELAY` | Delay between retries (seconds) | 1.0 |
 | `LOG_LEVEL` | Logging level | INFO |
+| `LOG_FORMAT` | Log format (json/text) | json |
+| `HOST` | Server host | 0.0.0.0 |
+| `PORT` | Server port | 8000 |
+| `DEBUG` | Debug mode | false |
 | `ENABLE_IMAGE_SEARCH` | Enable image search | true |
 | `ENABLE_GEOTAGGING` | Enable geotagging | true |
+| `CLEAN_TEXT` | Enable text cleaning | true |
+| `MAX_ARTICLE_LENGTH` | Maximum article length | 50000 |
 
 ### Database Setup
 
@@ -147,26 +180,17 @@ masx_cpu_pipeline/
 
 ### Quick Start
 
-The easiest way to start the application is using the provided run scripts:
+The easiest way to start the application:
 
 ```bash
-# Python script (cross-platform)
+# Main entry point (recommended)
 python run.py
-
-# Shell script (Unix/Linux/macOS)
-./run.sh
-
-# Batch file (Windows)
-run.bat
 ```
 
-These scripts will:
+This will:
 - Check Python version requirements
-- Create and activate virtual environment
-- Install dependencies automatically
-- Download required spaCy models
 - Validate environment configuration
-- Start the FastAPI server
+- Start the FastAPI server with proper logging
 
 ### API Endpoints
 
@@ -214,7 +238,7 @@ curl "http://localhost:8000/articles?limit=10&status=completed"
 curl -X POST "http://localhost:8000/feed/warmup"
 
 # Load feed entries for specific date
-curl -X POST "http://localhost:8000/feed/warmup?date=2025-07-02"
+curl -X POST "http://localhost:8000/feed/warmup?date=2025-01-15"
 ```
 
 #### Process All Feed Entries
@@ -223,13 +247,13 @@ curl -X POST "http://localhost:8000/feed/warmup?date=2025-07-02"
 curl -X POST "http://localhost:8000/feed/process"
 
 # Process all entries for specific date
-curl -X POST "http://localhost:8000/feed/process?date=2025-07-02"
+curl -X POST "http://localhost:8000/feed/process?date=2025-01-15"
 ```
 
 #### Process Feed Entries by Flashpoint ID
 ```bash
 # Process entries for specific flashpoint ID
-curl -X POST "http://localhost:8000/feed/process/flashpoint?date=2025-07-02&flashpoint_id=123e4567-e89b-12d3-a456-426614174000"
+curl -X POST "http://localhost:8000/feed/process/flashpoint?date=2025-01-15&flashpoint_id=123e4567-e89b-12d3-a456-426614174000"
 ```
 
 #### Get Feed Statistics
@@ -239,13 +263,13 @@ curl http://localhost:8000/feed/stats
 
 #### Get Loaded Feed Entries
 ```bash
-curl "http://localhost:8000/feed/entries/2025-07-02"
+curl "http://localhost:8000/feed/entries/2025-01-15"
 ```
 
 #### Clear Feed Entries from Memory
 ```bash
 # Clear specific date
-curl -X DELETE "http://localhost:8000/feed/clear/2025-07-02"
+curl -X DELETE "http://localhost:8000/feed/clear/2025-01-15"
 
 # Clear all dates
 curl -X DELETE "http://localhost:8000/feed/clear"
@@ -253,9 +277,9 @@ curl -X DELETE "http://localhost:8000/feed/clear"
 
 ### Feed Processing Workflow
 
-The application now supports processing feed entries from date-based tables:
+The application supports processing feed entries from date-based tables:
 
-1. **Warm Up**: Load feed entries from `feed_entries_{date}` table into memory (date in YYYY-MM-DD format)
+1. **Warm Up**: Load feed entries from `feed_entries_{date}` table into memory
 2. **Process**: Run complete pipeline (scrape → clean → geotag → find image → save to DB)
 3. **Filter**: Process specific entries by flashpoint_id
 4. **Monitor**: Track processing statistics and performance
@@ -291,24 +315,24 @@ async def process_articles():
         "metadata": {"source": "test"}
     }
     
-    result = await pipeline_manager.process_article(article_data)
+    result = await pipeline_manager.process_article(article_data, "2025-01-15")
     print(f"Processing result: {result['status']}")
     
     # Process batch
-    batch_result = await pipeline_manager.process_batch(["article_1", "article_2"])
+    batch_result = await pipeline_manager.process_batch(["article_1", "article_2"], "2025-01-15")
     print(f"Batch processing: {batch_result['successful']} successful, {batch_result['failed']} failed")
 
 async def process_feed_entries():
     # Warm up server with feed entries
-    warmup_result = await feed_processor.warm_up_server("2025-07-02")
+    warmup_result = await feed_processor.warm_up_server("2025-01-15")
     print(f"Warmed up with {warmup_result['total_entries']} entries")
     
     # Process all feed entries
-    process_result = await feed_processor.process_feed_entries_by_date("2025-07-02")
+    process_result = await feed_processor.process_feed_entries_by_date("2025-01-15")
     print(f"Processed: {process_result['successful']} successful, {process_result['failed']} failed")
     
     # Process specific flashpoint
-    flashpoint_result = await feed_processor.process_feed_entries_by_flashpoint_id("2025-07-02", "flashpoint_123")
+    flashpoint_result = await feed_processor.process_feed_entries_by_flashpoint_id("2025-01-15", "flashpoint_123")
     print(f"Flashpoint processing: {flashpoint_result['successful']} successful")
 
 # Run the examples
@@ -340,6 +364,12 @@ pytest -m slow
 pytest --cov=src --cov-report=html
 ```
 
+### Debug Testing
+```bash
+# Run debug script for testing feed processing
+python debug.py
+```
+
 ## 📊 Monitoring
 
 ### Health Check
@@ -348,15 +378,12 @@ pytest --cov=src --cov-report=html
 
 ### Statistics
 - **Endpoint**: `GET /stats`
-- **Response**: Processing statistics, thread pool metrics, database stats
+- **Response**: Processing statistics and database stats
 
-### Prometheus Metrics
-- **Endpoint**: `GET /metrics`
-- **Integration**: Built-in Prometheus metrics collection
-
-### Grafana Dashboard
-- **URL**: `http://localhost:3000`
-- **Default credentials**: admin/admin
+### Component Testing
+- **Text Cleaner**: `GET /test/text-cleaner?text=Hello&language=en`
+- **Geotagger**: `GET /test/geotagger?text=Paris&language=en`
+- **Image Finder**: `GET /test/image-finder?query=news&max_images=3&language=en`
 
 ## 🔧 Development
 
@@ -408,15 +435,22 @@ docker run -d \
 
 ### Benchmarks
 - **Processing Speed**: ~100,000 articles/day
-- **Concurrent Workers**: Up to 32 threads
+- **Concurrent Workers**: Up to 32 threads (thread-safe)
 - **Memory Usage**: ~2GB per worker
 - **Response Time**: <100ms for health checks
+
+### Thread Safety
+- **Parallel Execution**: Safe for production parallel batch processing
+- **Singleton Patterns**: All singletons are thread-safe
+- **Database Operations**: Parameter-based to avoid race conditions
+- **Cache Management**: Thread-safe caching with proper locking
 
 ### Optimization Tips
 1. **Adjust `MAX_WORKERS`** based on your CPU cores
 2. **Tune `BATCH_SIZE`** for your database performance
 3. **Enable caching** for frequently accessed data
 4. **Use connection pooling** for database connections
+5. **Monitor memory usage** during parallel processing
 
 ## 🚨 Troubleshooting
 
@@ -444,10 +478,10 @@ export MAX_WORKERS=8
 docker run -m 4g masx-etl-pipeline
 ```
 
-#### 4. API Rate Limits
+#### 4. Parallel Processing Issues
 ```bash
-# Check rate limiting in nginx.conf
-# Adjust limit_req_zone settings
+# Check thread safety
+python -c "from src.pipeline.pipeline_manager import pipeline_manager; print('Thread-safe pipeline ready')"
 ```
 
 ### Debug Mode
@@ -459,6 +493,25 @@ export DEBUG=true
 # Run with debug output
 python -m uvicorn src.api.server:app --reload --log-level debug
 ```
+
+## 🔄 Recent Updates
+
+### Thread Safety Improvements
+- **TranslationManager**: Removed global environment variable manipulation
+- **DatabaseClientAndPool**: Eliminated shared date/table_name state
+- **ProxyService**: Added thread-safe cache management
+- **PipelineManager**: Removed shared statistics to prevent race conditions
+
+### Code Cleanup
+- Removed unused code, classes, and methods
+- Eliminated commented-out test code
+- Improved error handling and logging
+- Enhanced configuration management
+
+### Performance Enhancements
+- Optimized batch size calculation for even worker distribution
+- Improved Supabase storage operations
+- Enhanced parallel processing capabilities
 
 ## 🤝 Contributing
 
@@ -473,6 +526,7 @@ python -m uvicorn src.api.server:app --reload --log-level debug
 - Write comprehensive tests
 - Update documentation
 - Use meaningful commit messages
+- Ensure thread safety for parallel operations
 
 ## 📄 License
 
@@ -483,16 +537,17 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **FastAPI** for the excellent web framework
 - **spaCy** for multilingual NLP capabilities
 - **Supabase** for the database backend
+- **Trafilatura** for content extraction
 - **BeautifulSoup** for HTML parsing
 - **httpx** for async HTTP client
 - **pytest** for testing framework
 
 ## 📞 Support
 
-- **Documentation**: [GitHub Wiki](https://github.com/masx-ai/etl-cpu-pipeline/wiki)
-- **Issues**: [GitHub Issues](https://github.com/masx-ai/etl-cpu-pipeline/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/masx-ai/etl-cpu-pipeline/discussions)
+- **Documentation**: [GitHub Wiki](https://github.com/masx-ai/masx_ai_etl_cpu_pipeline/wiki)
+- **Issues**: [GitHub Issues](https://github.com/masx-ai/masx_ai_etl_cpu_pipeline/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/masx-ai/masx_ai_etl_cpu_pipeline/discussions)
 
 ---
 
-**Built with ❤️ by the MASX AI Team**
+**Built with 🔥 by the MASX AI Team**
