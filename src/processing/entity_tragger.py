@@ -9,6 +9,7 @@ from src.models import EntityModel, EntityAttributes, MetaAttributes
 # Optional: LOC→GPE promotion
 try:
     import countrytagger  # provides tag_place, tag_text_countries
+
     _HAS_COUNTRYTAGGER = True
 except Exception:
     countrytagger = None
@@ -38,7 +39,7 @@ class EntityTagger:
             self.ner = pipeline(
                 task="ner",
                 model=self.MODEL_ID,
-                device=-1,                      # CPU
+                device=-1,  # CPU
                 aggregation_strategy="simple",  # merge wordpieces
                 batch_size=self.batch_size,
             )
@@ -46,8 +47,7 @@ class EntityTagger:
         except Exception as e:
             self.logger.warning("NER model failed to load", error=str(e))
             self.ner = None
-            
-       
+
         if _HAS_COUNTRYTAGGER:
             self.logger.info("countrytagger available: LOC→GPE promotion enabled")
         else:
@@ -55,7 +55,9 @@ class EntityTagger:
 
         # ---- lightweight regex extractors ----
         self.re_year = re.compile(r"\b(1[5-9]\d{2}|20\d{2}|21\d{2})\b")
-        self.re_date_num = re.compile(r"\b([0-3]?\d)[/\-.]([0-1]?\d)[/\-.]((?:19|20)\d{2})\b")
+        self.re_date_num = re.compile(
+            r"\b([0-3]?\d)[/\-.]([0-1]?\d)[/\-.]((?:19|20)\d{2})\b"
+        )
         self.re_money = re.compile(
             r"(?:(?<!\w)(?:R\$|US\$|\$|€|£|¥)\s?\d{1,3}(?:[\.\,\s]\d{3})*(?:[\,\.]\d{1,2})?"
             r"|(?:\d{1,3}(?:[\.\,\s]\d{3})*(?:[\,\.]\d{1,2})?\s?(?:USD|EUR|BRL|GBP|JPY)))"
@@ -84,15 +86,24 @@ class EntityTagger:
 
     def extract_entities(self, text: str) -> EntityModel:
         try:
-            
             if not self.enabled or not text or not self.ner:
                 return EntityModel(
-                    PERSON=[], ORG=[], GPE=[], LOC=[], NORP=[], EVENT=[], LAW=[],
-                    DATE=[], MONEY=[], QUANTITY=[],
+                    PERSON=[],
+                    ORG=[],
+                    GPE=[],
+                    LOC=[],
+                    NORP=[],
+                    EVENT=[],
+                    LAW=[],
+                    DATE=[],
+                    MONEY=[],
+                    QUANTITY=[],
                     meta=MetaAttributes(
-                        chunks=0, chars=len(text) if text else 0,
-                        model=self.MODEL_ID, score=0.0
-                    )
+                        chunks=0,
+                        chars=len(text) if text else 0,
+                        model=self.MODEL_ID,
+                        score=0.0,
+                    ),
                 )
 
             raw: Dict[str, List[Tuple[str, float]]] = defaultdict(list)
@@ -139,18 +150,19 @@ class EntityTagger:
             #     else:
             #         kept_loc.append((word, score))
 
-
             # 3) Aggregate & dedupe
-            buckets: Dict[str, Dict[str, float]] = {"PERSON": {}, 
-                                                    "ORG": {}, 
-                                                    "GPE": {}, 
-                                                    "LOC": {},
-                                                    "NORP": {},
-                                                    "EVENT": {},
-                                                    "LAW": {},
-                                                    "DATE": {}, 
-                                                    "MONEY": {}, 
-                                                    "QUANTITY": {}}
+            buckets: Dict[str, Dict[str, float]] = {
+                "PERSON": {},
+                "ORG": {},
+                "GPE": {},
+                "LOC": {},
+                "NORP": {},
+                "EVENT": {},
+                "LAW": {},
+                "DATE": {},
+                "MONEY": {},
+                "QUANTITY": {},
+            }
 
             def _accumulate(pairs: List[Tuple[str, float]], label: str) -> None:
                 counts = Counter()
@@ -188,12 +200,14 @@ class EntityTagger:
             #         buckets[label] = {}
             #     for w, s in extra.get(label, []):
             #         buckets[label][w] = max(buckets[label].get(w, 0.0), s)
-            for label in ["EVENT", "LAW", "DATE", "MONEY", "QUANTITY", "NORP"]:             
+            for label in ["EVENT", "LAW", "DATE", "MONEY", "QUANTITY", "NORP"]:
                 _accumulate(extra.get(label, []), label)
-                
+
             # 5) Build EntityModel
             def _list(mapping: Dict[str, float]) -> List[EntityAttributes]:
-                items = [EntityAttributes(text=k, score=float(v)) for k, v in mapping.items()]
+                items = [
+                    EntityAttributes(text=k, score=float(v)) for k, v in mapping.items()
+                ]
                 items.sort(key=lambda e: (-e.score, e.text.lower()))
                 return items
 
@@ -212,16 +226,33 @@ class EntityTagger:
                 MONEY=_list(buckets.get("MONEY", {})),
                 QUANTITY=_list(buckets.get("QUANTITY", {})),
                 meta=MetaAttributes(
-                    chunks=num_chunks, chars=len(text), model=self.MODEL_ID, score=overall
-                )
+                    chunks=num_chunks,
+                    chars=len(text),
+                    model=self.MODEL_ID,
+                    score=overall,
+                ),
             )
         except Exception as e:
             self.logger.warning("EntityTagger failed to extract entities", error=str(e))
             return EntityModel(
-                PERSON=[], ORG=[], GPE=[], LOC=[], NORP=[], EVENT=[], LAW=[],
-                DATE=[], MONEY=[], QUANTITY=[],
-                meta=MetaAttributes(chunks=0, chars=len(text) if text else 0, model=self.MODEL_ID, score=0.0)
+                PERSON=[],
+                ORG=[],
+                GPE=[],
+                LOC=[],
+                NORP=[],
+                EVENT=[],
+                LAW=[],
+                DATE=[],
+                MONEY=[],
+                QUANTITY=[],
+                meta=MetaAttributes(
+                    chunks=0,
+                    chars=len(text) if text else 0,
+                    model=self.MODEL_ID,
+                    score=0.0,
+                ),
             )
+
     def _get_geopolitical_entities(self, text: str) -> set[str]:
         """
         Use spaCy multilingual NER (xx_ent_wiki_sm) to extract GPE/LOC entities
@@ -231,8 +262,7 @@ class EntityTagger:
         entities: set[str] = set()
         if not self.spacy_nlp:
             return entities
-        
-        
+
         """
     Run spaCy NER on input text and return a dynamic dictionary
     with all detected entity labels as keys.
@@ -261,20 +291,15 @@ class EntityTagger:
 
         avg_score = sum(scores) / len(scores) if scores else 0.0
 
-        
-             
-        
-        
-
         for chunk in self._iter_chunks(text):
             try:
                 doc = self.spacy_nlp(chunk)
                 for ent in doc.ents:
                     if ent.label_ in {"GPE"}:
-                        entities.add(ent.text.lower())                        
+                        entities.add(ent.text.lower())
             except Exception as e:
                 self.logger.warning("spaCy failed on a chunk", error=str(e))
-                continue        
+                continue
         return entities
 
     # ---- Internals ----------------------------------------------------------
@@ -298,11 +323,13 @@ class EntityTagger:
 
         for m in self.re_event.finditer(text):
             val = m.group(0).strip()
-            if val: found["EVENT"].append((val, 0.95))
+            if val:
+                found["EVENT"].append((val, 0.95))
 
         for m in self.re_law.finditer(text):
             val = m.group(0).strip()
-            if val: found["LAW"].append((val, 0.90))
+            if val:
+                found["LAW"].append((val, 0.90))
 
         for m in self.re_year.finditer(text):
             found["DATE"].append((m.group(0), 0.99))

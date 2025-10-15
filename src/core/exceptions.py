@@ -130,8 +130,8 @@ class AnalyticsError(MASXException):
 
     pass
 
+
 class DatabaseError(MASXException):
     """Exception raised for analytics-related errors."""
 
     pass
-

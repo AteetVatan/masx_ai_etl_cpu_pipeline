@@ -38,7 +38,7 @@ def test_settings():
         log_level="DEBUG",
         enable_image_search=True,
         enable_geotagging=True,
-        clean_text=True
+        clean_text=True,
     )
 
 
@@ -53,7 +53,9 @@ def mock_db_client():
     client.fetch_article_by_id = AsyncMock(return_value=None)
     client.update_articles_batch = AsyncMock(return_value=(0, 0))
     client.update_article_status = AsyncMock(return_value=True)
-    client.get_processing_stats = AsyncMock(return_value={"pending": 0, "completed": 0, "failed": 0})
+    client.get_processing_stats = AsyncMock(
+        return_value={"pending": 0, "completed": 0, "failed": 0}
+    )
     return client
 
 
@@ -61,18 +63,20 @@ def mock_db_client():
 def mock_scraper():
     """Mock article scraper for testing."""
     scraper = AsyncMock(spec=BeautifulSoupExtractor)
-    scraper.scrape_article = AsyncMock(return_value={
-        "url": "https://example.com/article",
-        "title": "Test Article",
-        "content": "This is test content for the article.",
-        "author": "Test Author",
-        "published_date": "2024-01-01",
-        "images": [],
-        "metadata": {},
-        "scraped_at": "2024-01-01T00:00:00Z",
-        "word_count": 8,
-        "language": "en"
-    })
+    scraper.scrape_article = AsyncMock(
+        return_value={
+            "url": "https://example.com/article",
+            "title": "Test Article",
+            "content": "This is test content for the article.",
+            "author": "Test Author",
+            "published_date": "2024-01-01",
+            "images": [],
+            "metadata": {},
+            "scraped_at": "2024-01-01T00:00:00Z",
+            "word_count": 8,
+            "language": "en",
+        }
+    )
     return scraper
 
 
@@ -87,7 +91,7 @@ def mock_text_cleaner():
         "removed_elements": ["whitespace_normalization"],
         "language": "en",
         "cleaning_applied": True,
-        "compression_ratio": 1.2
+        "compression_ratio": 1.2,
     }
     return cleaner
 
@@ -104,7 +108,7 @@ def mock_geotagger():
         "other_locations": [],
         "confidence_scores": {},
         "language": "en",
-        "extraction_method": "spacy_ner"
+        "extraction_method": "spacy_ner",
     }
     return geotagger
 
@@ -114,23 +118,25 @@ def mock_image_finder():
     """Mock image finder for testing."""
     finder = AsyncMock(spec=ImageFinder)
     finder.enabled = True
-    finder.find_images = AsyncMock(return_value={
-        "images": [
-            {
-                "url": "https://example.com/image1.jpg",
-                "thumbnail_url": "https://example.com/thumb1.jpg",
-                "title": "Test Image 1",
-                "description": "Test image description",
-                "width": 800,
-                "height": 600,
-                "source": "test"
-            }
-        ],
-        "total_found": 1,
-        "search_method": "test",
-        "query": "test query",
-        "language": "en"
-    })
+    finder.find_images = AsyncMock(
+        return_value={
+            "images": [
+                {
+                    "url": "https://example.com/image1.jpg",
+                    "thumbnail_url": "https://example.com/thumb1.jpg",
+                    "title": "Test Image 1",
+                    "description": "Test image description",
+                    "width": 800,
+                    "height": 600,
+                    "source": "test",
+                }
+            ],
+            "total_found": 1,
+            "search_method": "test",
+            "query": "test query",
+            "language": "en",
+        }
+    )
     finder.generate_search_queries.return_value = ["test query", "test article"]
     return finder
 
@@ -143,15 +149,8 @@ def mock_thread_pool():
     pool.shutdown = MagicMock()
     pool.is_healthy.return_value = True
     pool.get_stats.return_value = {
-        "pool_status": {
-            "current_workers": 4,
-            "max_workers": 8,
-            "is_running": True
-        },
-        "performance": {
-            "total_tasks_completed": 100,
-            "tasks_per_second": 10.5
-        }
+        "pool_status": {"current_workers": 4, "max_workers": 8, "is_running": True},
+        "performance": {"total_tasks_completed": 100, "tasks_per_second": 10.5},
     }
     return pool
 
@@ -167,10 +166,7 @@ def sample_article_data():
         "author": "Test Author",
         "published_date": "2024-01-01",
         "status": "pending",
-        "metadata": {
-            "source": "test",
-            "category": "technology"
-        }
+        "metadata": {"source": "test", "category": "technology"},
     }
 
 
@@ -187,16 +183,13 @@ def sample_scraped_data():
             {
                 "url": "https://example.com/image.jpg",
                 "alt": "Test image",
-                "title": "Test Image"
+                "title": "Test Image",
             }
         ],
-        "metadata": {
-            "source": "test",
-            "category": "technology"
-        },
+        "metadata": {"source": "test", "category": "technology"},
         "scraped_at": "2024-01-01T00:00:00Z",
         "word_count": 12,
-        "language": "en"
+        "language": "en",
     }
 
 
@@ -216,13 +209,10 @@ def sample_enriched_data():
                 "title": "Test Image",
                 "width": 800,
                 "height": 600,
-                "source": "test"
+                "source": "test",
             }
         ],
-        "metadata": {
-            "source": "test",
-            "category": "technology"
-        },
+        "metadata": {"source": "test", "category": "technology"},
         "scraped_at": "2024-01-01T00:00:00Z",
         "word_count": 12,
         "language": "en",
@@ -230,7 +220,7 @@ def sample_enriched_data():
             "original_length": 50,
             "cleaned_length": 45,
             "removed_elements": ["whitespace_normalization"],
-            "compression_ratio": 0.9
+            "compression_ratio": 0.9,
         },
         "geographic_entities": {
             "countries": ["United States"],
@@ -239,13 +229,13 @@ def sample_enriched_data():
             "other_locations": [],
             "confidence_scores": {},
             "language": "en",
-            "extraction_method": "spacy_ner"
+            "extraction_method": "spacy_ner",
         },
         "image_search_metadata": {
             "queries_used": ["test query"],
             "search_method": "test",
-            "total_found": 1
-        }
+            "total_found": 1,
+        },
     }
 
 
@@ -258,15 +248,15 @@ def sample_batch_data():
             "url": "https://example.com/article1",
             "title": "Test Article 1",
             "content": "Test content 1",
-            "status": "pending"
+            "status": "pending",
         },
         {
             "id": "test_article_2",
             "url": "https://example.com/article2",
             "title": "Test Article 2",
             "content": "Test content 2",
-            "status": "pending"
-        }
+            "status": "pending",
+        },
     ]
 
 
@@ -281,15 +271,9 @@ def event_loop():
 # Pytest configuration
 def pytest_configure(config):
     """Configure pytest with custom markers."""
-    config.addinivalue_line(
-        "markers", "unit: mark test as a unit test"
-    )
-    config.addinivalue_line(
-        "markers", "integration: mark test as an integration test"
-    )
-    config.addinivalue_line(
-        "markers", "slow: mark test as slow running"
-    )
+    config.addinivalue_line("markers", "unit: mark test as a unit test")
+    config.addinivalue_line("markers", "integration: mark test as an integration test")
+    config.addinivalue_line("markers", "slow: mark test as slow running")
 
 
 def pytest_collection_modifyitems(config, items):

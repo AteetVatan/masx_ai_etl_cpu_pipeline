@@ -26,7 +26,6 @@ ERROR_PATTERNS = [
     r"network changed",
     r"proxy connection failed",
     r"too many redirects",
-
     # --- Common HTTP error responses ---
     r"service unavailable",
     r"temporarily unavailable",
@@ -37,7 +36,6 @@ ERROR_PATTERNS = [
     r"502 bad gateway",
     r"error 503",
     r"503 service unavailable",
-
     # --- Chrome / Chromium specific error codes ---
     r"err_connection_timed_out",
     r"err_connection_refused",
@@ -61,7 +59,6 @@ ERROR_PATTERNS = [
     r"err_quic_protocol_error",
     r"err_proxy_connection_failed",
     r"err_proxy_connection_refused",
-
     # --- Localized (non-English) ---
     r"zeitüberschreitung",
     r"verbindungszeitüberschreitung",

@@ -33,21 +33,20 @@ class Geotagger:
         self.enabled = getattr(self.settings, "enable_geotagging", True)
         # never let chunk size be too small; large-enough windows reduce overhead and cross-boundary splits
         self.chunk_chars = max(5_000, int(chunk_chars))
-        
-
-
 
         # CountryTagger builds/loads its Aho–Corasick automaton lazily on first call.
         # No object to construct; just confirm import:
         self.logger.info(
             "CountryTagger ready",
             version=getattr(countrytagger, "__version__", "unknown"),
-            chunk_chars=self.chunk_chars
+            chunk_chars=self.chunk_chars,
         )
 
     # ---- public API ---------------------------------------------------------
 
-    def extract_geographic_entities(self, title: str, text: str, locations: List[EntityAttributes]) -> list[GeoEntity]:
+    def extract_geographic_entities(
+        self, title: str, text: str, locations: List[EntityAttributes]
+    ) -> list[GeoEntity]:
         """
         Extract country (required) and optional city (bonus) entities from multilingual text.
 
@@ -66,66 +65,84 @@ class Geotagger:
               "meta": {"chunks": int, "chars": int}
             }
         """
-        try: 
-            
+        try:
             if not self.enabled or not text:
-                    return []
-                    
+                return []
 
-            countries_dict, num_chunks = self._get_countrytragger_countries(text)        
-            countries_from_title_dict, num_chunks_from_title = self._get_countrytragger_countries(title)
-            
+            countries_dict, num_chunks = self._get_countrytragger_countries(text)
+            (
+                countries_from_title_dict,
+                num_chunks_from_title,
+            ) = self._get_countrytragger_countries(title)
+
             # BONUS: cities (off by default). This library maps place names -> country code,
             # but does not emit city names during scanning. If you want a minimal bonus pass,
             # toggle enable_city_bonus=True and provide your own candidate city strings.
             cities: List[Dict[str, Any]] = []
-            
-            #countries , countries_from_title -> take top 4 
+
+            # countries , countries_from_title -> take top 4
             # now merge them
-        
-            for country_title_key, country_title_value in countries_from_title_dict.items():
+
+            for (
+                country_title_key,
+                country_title_value,
+            ) in countries_from_title_dict.items():
                 if country_title_key not in countries_dict:
                     countries_dict[country_title_key] = country_title_value
-                else:               
-                    countries_dict[country_title_key]["count"] += country_title_value["count"]
+                else:
+                    countries_dict[country_title_key]["count"] += country_title_value[
+                        "count"
+                    ]
                     countries_dict[country_title_key]["avg_score"] = 1.0
-                    if countries_dict[country_title_key]["avg_score"] < country_title_value["avg_score"]:
-                        countries_dict[country_title_key]["avg_score"] = country_title_value["avg_score"]
+                    if (
+                        countries_dict[country_title_key]["avg_score"]
+                        < country_title_value["avg_score"]
+                    ):
+                        countries_dict[country_title_key][
+                            "avg_score"
+                        ] = country_title_value["avg_score"]
 
             # Convert dict to list
             countries = list(countries_dict.values())
-            
-            
-            #filter countries
+
+            # filter countries
             countries = [
-                c for c in countries
-                if c["count"] >= 2 and c["avg_score"] >= 0.6
+                c for c in countries if c["count"] >= 2 and c["avg_score"] >= 0.6
             ]
-                
+
             # --- spaCy validation (chunk-aware) ---
             if countries and locations:
-                validated_loc_entities = self._validate_loc_entities_with_countrytagger(locations)
-                loc_codes = {alpha2 for alpha2, score in validated_loc_entities}  # only ISO2 codes
+                validated_loc_entities = self._validate_loc_entities_with_countrytagger(
+                    locations
+                )
+                loc_codes = {
+                    alpha2 for alpha2, score in validated_loc_entities
+                }  # only ISO2 codes
                 validated = [c for c in countries if c["alpha2"].lower() in loc_codes]
                 if validated:
                     countries = validated
 
-            #sort
-            final_countries = sorted(countries, key=lambda d: (-d["count"], -d["avg_score"]))        
-            
+            # sort
+            final_countries = sorted(
+                countries, key=lambda d: (-d["count"], -d["avg_score"])
+            )
+
             # take top 4
             final_countries = countries[:4]
-            
-            #final countries
+
+            # final countries
             final_countries = [GeoEntity(**c) for c in final_countries]
             return final_countries
-    
+
         except Exception as e:
-            self.logger.warning("Geotagger failed to extract geographic entities", error=str(e))
+            self.logger.warning(
+                "Geotagger failed to extract geographic entities", error=str(e)
+            )
             return []
-        
-    
-    def _get_countrytragger_countries(self, text: str) -> (Dict[str, Dict[str, Any]], int):
+
+    def _get_countrytragger_countries(
+        self, text: str
+    ) -> (Dict[str, Dict[str, Any]], int):
         try:
             # Accumulators (preserve stable order of first appearance)
             by_key: OrderedDict[str, Dict[str, Any]] = OrderedDict()
@@ -135,20 +152,24 @@ class Geotagger:
             for num_chunks, chunk in enumerate(self._iter_chunks(text), start=1):
                 try:
                     # countrytagger.tag_text_countries yields (alpha2_code, score, country_name)
-                    for feature_code, score, country in countrytagger.tag_text_countries(chunk):
+                    for (
+                        feature_code,
+                        score,
+                        country,
+                    ) in countrytagger.tag_text_countries(chunk):
                         if not country:
                             continue
                         key = country.lower()
                         enriched = self.enrich_country(key)
-                        
+
                         if key not in by_key:
                             by_key[key] = {
-                                    "name": enriched["name"],
-                                    "alpha2": enriched["alpha2"],
-                                    "alpha3": enriched["alpha3"],
-                                    "count": 0,
-                                    "avg_score": 0.0,
-                                    }
+                                "name": enriched["name"],
+                                "alpha2": enriched["alpha2"],
+                                "alpha3": enriched["alpha3"],
+                                "count": 0,
+                                "avg_score": 0.0,
+                            }
                         counts[key] += 1
                         score_sums[key] += float(score or 0.0)
                 except Exception as e:
@@ -162,45 +183,46 @@ class Geotagger:
                 row["avg_score"] = round(score_sums[k] / total, 4)
 
             countries = sorted(by_key.values(), key=lambda d: (-d["count"], d["name"]))
-            
+
             # Make it a dict with alpha2 as key
-            countries_dict: Dict[str, Dict[str, Any]] = {country["alpha2"]: country for country in countries}
-            
-           
-            
-            
-            return countries_dict , num_chunks
-        
+            countries_dict: Dict[str, Dict[str, Any]] = {
+                country["alpha2"]: country for country in countries
+            }
+
+            return countries_dict, num_chunks
+
         except Exception as e:
             self.logger.warning("CountryTagger failed on a chunk", error=str(e))
             return [], 0
-        
 
-    
-    #entiries set[str]
-    def _validate_loc_entities_with_countrytagger(self, loc_entities: List[EntityAttributes]) -> set[str]:
-        valid_entities = set()        
-        #check entites against countrytagger.tag_place(ent)
-        for loc in loc_entities:        
-            
-            if loc.score < 0.80:  #from Davlan/distilbert-base-multilingual-cased-ner-hrl
+    # entiries set[str]
+    def _validate_loc_entities_with_countrytagger(
+        self, loc_entities: List[EntityAttributes]
+    ) -> set[str]:
+        valid_entities = set()
+        # check entites against countrytagger.tag_place(ent)
+        for loc in loc_entities:
+            if (
+                loc.score < 0.80
+            ):  # from Davlan/distilbert-base-multilingual-cased-ner-hrl
                 continue  # skip low confidence entities
-            
+
             # 1. Exact match
             code, score, alpha2 = countrytagger.tag_place(loc.text)
             if code == "PCLI" and alpha2:
                 combined_score = float(loc.score) * float(score or 0.0)
-                
+
                 valid_entities.add((alpha2.lower(), combined_score))
                 continue
 
             # 2. Substring match
-            for alpha2, score, country_name in countrytagger.tag_text_countries(loc.text):
+            for alpha2, score, country_name in countrytagger.tag_text_countries(
+                loc.text
+            ):
                 if pycountry.countries.get(alpha_2=alpha2.upper()):
                     combined_score = float(loc.score) * float(score or 0.0)
-                    valid_entities.add((alpha2.lower(), combined_score))   
+                    valid_entities.add((alpha2.lower(), combined_score))
 
-        
         return valid_entities
 
     # ---- internals ----------------------------------------------------------
@@ -241,8 +263,8 @@ class Geotagger:
             "country": country_name,
             "score": float(score or 0.0),
         }
-        
-    def enrich_country(self,iso2: str) -> dict:
+
+    def enrich_country(self, iso2: str) -> dict:
         try:
             c = pycountry.countries.get(alpha_2=iso2.upper())
             if c:
@@ -254,4 +276,3 @@ class Geotagger:
 
 # Global singleton
 geotagger = Geotagger()
-

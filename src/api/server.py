@@ -48,8 +48,10 @@ class StatsResponse(BaseModel):
     database_stats: Dict[str, Any]
     uptime: float
 
+
 class FeedWarmupRequest(BaseModel):
     date: str | None = None
+
 
 class FeedWarmupResponse(BaseModel):
     """Response model for feed warm-up."""
@@ -59,16 +61,16 @@ class FeedWarmupResponse(BaseModel):
     total_entries: int
     message: str
     timestamp: str
-    
+
+
 class FeedProcessRequest(BaseModel):
-    date: str | None = None    
+    date: str | None = None
     flashpoints: list[str] | None = None
     trigger: str | None = None
- 
-    
+
+
 class FeedProcessResponse(BaseModel):
     """Response model for feed processing."""
-    
 
     status: str
     message: str
@@ -76,14 +78,16 @@ class FeedProcessResponse(BaseModel):
     total_entries: int
     successful: int
     failed: int
-    processing_time: float    
+    processing_time: float
     timestamp: str
+
 
 class FeedProcessFlashpointRequest(BaseModel):
     date: str | None = None
     flashpoint_id: str | None = None
     trigger: str | None = None
-    
+
+
 class FeedProcessFlashpointResponse(BaseModel):
     """Response model for feed processing by flashpoint ID."""
 
@@ -298,7 +302,9 @@ async def get_stats():
 
 
 @app.post("/feed/warmup", response_model=FeedWarmupResponse)
-async def warmup_feed_entries(request: FeedWarmupRequest, db: DatabaseClientAndPool = Depends(get_db_client)):
+async def warmup_feed_entries(
+    request: FeedWarmupRequest, db: DatabaseClientAndPool = Depends(get_db_client)
+):
     """
     Warm up the server by loading feed entries for a specific date.
 
@@ -322,16 +328,20 @@ async def warmup_feed_entries(request: FeedWarmupRequest, db: DatabaseClientAndP
 
     except DatabaseError as e:
         logger.error(f"Database error during warm-up: {e}")
-        raise HTTPException(status_code=404, detail=f"Table feed_entries_{date} not available")
+        raise HTTPException(
+            status_code=404, detail=f"Table feed_entries_{date} not available"
+        )
     except Exception as e:
         logger.error(f"Unexpected error during warm-up: {e}")
         raise HTTPException(status_code=500, detail=f"Warm-up failed: {str(e)}")
 
 
 @app.post("/feed/process", response_model=FeedProcessResponse)
-async def process_feed_entries(request: FeedProcessRequest,
-                               background_tasks: BackgroundTasks,
-                               db: DatabaseClientAndPool = Depends(get_db_client)):
+async def process_feed_entries(
+    request: FeedProcessRequest,
+    background_tasks: BackgroundTasks,
+    db: DatabaseClientAndPool = Depends(get_db_client),
+):
     """
     Process all feed entries for a specific date.
 
@@ -351,10 +361,12 @@ async def process_feed_entries(request: FeedProcessRequest,
 
         # Process feed entries
         feed_processor.set_date(validated_date)
-        
-         # Fire-and-forget mode for MASX AI trigger
-        if getattr(request, "trigger", None) == "masxai":            
-            background_tasks.add_task(feed_processor.process_all_feed_entries, batch_mode=True)
+
+        # Fire-and-forget mode for MASX AI trigger
+        if getattr(request, "trigger", None) == "masxai":
+            background_tasks.add_task(
+                feed_processor.process_all_feed_entries, batch_mode=True
+            )
             logger.info(f"MASX AI background job started for {validated_date}")
             return FeedProcessResponse(
                 status="started",
@@ -364,15 +376,17 @@ async def process_feed_entries(request: FeedProcessRequest,
                 successful=0,
                 failed=0,
                 processing_time=0,
-                timestamp=datetime.utcnow().isoformat()
-            )        
-        
+                timestamp=datetime.utcnow().isoformat(),
+            )
+
         result = await feed_processor.process_all_feed_entries(batch_mode=True)
         return FeedProcessResponse(**result)
 
     except DatabaseError as e:
         logger.error(f"Database error during processing: {e}")
-        raise HTTPException(status_code=404, detail=f"Table feed_entries_{date} not available")
+        raise HTTPException(
+            status_code=404, detail=f"Table feed_entries_{date} not available"
+        )
     except Exception as e:
         logger.error(f"Unexpected error during processing: {e}")
         raise HTTPException(status_code=500, detail=f"Processing failed: {str(e)}")
@@ -381,8 +395,8 @@ async def process_feed_entries(request: FeedProcessRequest,
 @app.post("/feed/process/flashpoint", response_model=FeedProcessFlashpointResponse)
 async def process_feed_entries_by_flashpoint(
     request: FeedProcessFlashpointRequest,
-    background_tasks: BackgroundTasks, 
-    db: DatabaseClientAndPool = Depends(get_db_client)
+    background_tasks: BackgroundTasks,
+    db: DatabaseClientAndPool = Depends(get_db_client),
 ):
     """
     Process feed entries for a specific date and flashpoint ID.
@@ -408,11 +422,15 @@ async def process_feed_entries_by_flashpoint(
 
         # Process feed entries by flashpoint ID
         feed_processor.set_date(validated_date)
-        
+
         # Fire-and-forget mode for MASX AI trigger
-        if getattr(request, "trigger", None) == "masxai":            
-            background_tasks.add_task(feed_processor.process_feed_entries_by_flashpoint_id, flashpoint_id)
-            logger.info(f"MASX AI background job started for {validated_date} and flashpoint_id {flashpoint_id}")
+        if getattr(request, "trigger", None) == "masxai":
+            background_tasks.add_task(
+                feed_processor.process_feed_entries_by_flashpoint_id, flashpoint_id
+            )
+            logger.info(
+                f"MASX AI background job started for {validated_date} and flashpoint_id {flashpoint_id}"
+            )
             return FeedProcessFlashpointResponse(
                 status="started",
                 message=f"MASX AI background processing initiated for {validated_date} and flashpoint_id {flashpoint_id}",
@@ -422,24 +440,29 @@ async def process_feed_entries_by_flashpoint(
                 successful=0,
                 failed=0,
                 processing_time=0,
-                timestamp=datetime.utcnow().isoformat()
+                timestamp=datetime.utcnow().isoformat(),
             )
-        
-        
-        result = await feed_processor.process_feed_entries_by_flashpoint_id(flashpoint_id)
+
+        result = await feed_processor.process_feed_entries_by_flashpoint_id(
+            flashpoint_id
+        )
 
         return FeedProcessFlashpointResponse(**result)
 
     except DatabaseError as e:
         logger.error(f"Database error during processing: {e}")
-        raise HTTPException(status_code=404, detail=f"Table feed_entries_{date} not available")
+        raise HTTPException(
+            status_code=404, detail=f"Table feed_entries_{date} not available"
+        )
     except Exception as e:
         logger.error(f"Unexpected error during processing: {e}")
         raise HTTPException(status_code=500, detail=f"Processing failed: {str(e)}")
 
 
 @app.get("/feed/entries/{date}")
-async def get_feed_entries(date: str, db: DatabaseClientAndPool = Depends(get_db_client)):
+async def get_feed_entries(
+    date: str, db: DatabaseClientAndPool = Depends(get_db_client)
+):
     """
     Get loaded feed entries for a specific date.
 
@@ -456,11 +479,17 @@ async def get_feed_entries(date: str, db: DatabaseClientAndPool = Depends(get_db
         feed_processor.set_date(validated_date)
         feed_entries = feed_processor.get_feed_entries()
 
-        return {"date": validated_date, "total_entries": len(feed_entries), "entries": feed_entries}
+        return {
+            "date": validated_date,
+            "total_entries": len(feed_entries),
+            "entries": feed_entries,
+        }
 
     except Exception as e:
         logger.error(f"Error getting feed entries: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get feed entries: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get feed entries: {str(e)}"
+        )
 
 
 @app.get("/feed/stats")
@@ -477,7 +506,9 @@ async def get_feed_stats():
 
     except Exception as e:
         logger.error(f"Error getting feed stats: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get feed stats: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get feed stats: {str(e)}"
+        )
 
 
 @app.delete("/feed/clear/{date}")
@@ -505,7 +536,9 @@ async def clear_feed_entries(date: str):
 
     except Exception as e:
         logger.error(f"Error clearing feed entries: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to clear feed entries: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to clear feed entries: {str(e)}"
+        )
 
 
 @app.delete("/feed/clear")
@@ -519,11 +552,16 @@ async def clear_all_feed_entries():
         # Clear all feed entries
         feed_processor.clear_feed_entries()
 
-        return {"message": "Cleared all feed entries from memory", "timestamp": datetime.utcnow().isoformat()}
+        return {
+            "message": "Cleared all feed entries from memory",
+            "timestamp": datetime.utcnow().isoformat(),
+        }
 
     except Exception as e:
         logger.error(f"Error clearing all feed entries: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to clear feed entries: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to clear feed entries: {str(e)}"
+        )
 
 
 # Global exception handler
@@ -531,4 +569,7 @@ async def clear_all_feed_entries():
 async def global_exception_handler(request, exc):
     """Global exception handler for unhandled errors."""
     logger.error(f"Unhandled exception: {exc}", exc_info=True)
-    return JSONResponse(status_code=500, content={"detail": "Internal server error", "type": "internal_error"})
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error", "type": "internal_error"},
+    )

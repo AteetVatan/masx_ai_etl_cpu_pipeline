@@ -42,7 +42,7 @@ class ImageFinder:
         self.supported_formats = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 
         logger.info("DuckDuckGo ImageFinder initialized")
-    
+
     async def test_duckduckgo(self):
         """Test DuckDuckGo image search."""
         try:
@@ -58,44 +58,52 @@ class ImageFinder:
         max_images: int = 5,
         proxies: list[str] | None = None,
         duckduckgo_region: str = "us-en",
-        ) -> List[Dict[str, Any]] | None:
+    ) -> List[Dict[str, Any]] | None:
         # Remove proxy env vars
-        for var in ("HTTP_PROXY","HTTPS_PROXY","ALL_PROXY","http_proxy","https_proxy","all_proxy"):
-            os.environ.pop(var, None)            
-            
-        try: 
-            client = httpx.Client(http2=False, verify=True) 
-            with DDGS(proxy=None, timeout=20, verify=True) as ddgs:
-                results = ddgs.images(query, max_results=max_images, region=duckduckgo_region)                
-                return results 
-        except Exception as e: 
-            pass
-        
-        proxy=None
-        if proxies: 
-            proxy = choice(proxies) 
-            proxy = f"http://{proxy}"
-            
-        if proxy:
-            try: 
-                client = httpx.Client(http2=False, verify=True) 
-                with DDGS(proxy=proxy, timeout=20, verify=True) as ddgs:                    
-                    results = ddgs.images(query, max_results=max_images, region=duckduckgo_region)
-                    return results 
-            except Exception as e: 
-                pass
-            
+        for var in (
+            "HTTP_PROXY",
+            "HTTPS_PROXY",
+            "ALL_PROXY",
+            "http_proxy",
+            "https_proxy",
+            "all_proxy",
+        ):
+            os.environ.pop(var, None)
 
-        
+        try:
+            client = httpx.Client(http2=False, verify=True)
+            with DDGS(proxy=None, timeout=20, verify=True) as ddgs:
+                results = ddgs.images(
+                    query, max_results=max_images, region=duckduckgo_region
+                )
+                return results
+        except Exception as e:
+            pass
+
+        proxy = None
+        if proxies:
+            proxy = choice(proxies)
+            proxy = f"http://{proxy}"
+
+        if proxy:
+            try:
+                client = httpx.Client(http2=False, verify=True)
+                with DDGS(proxy=proxy, timeout=20, verify=True) as ddgs:
+                    results = ddgs.images(
+                        query, max_results=max_images, region=duckduckgo_region
+                    )
+                    return results
+            except Exception as e:
+                pass
+
         return None
-        
 
     async def find_images(
         self,
-        query: str,        
+        query: str,
         max_images: int = 5,
-        duckduckgo_region: str = None, #"en-us",
-        proxies: list[str] = None
+        duckduckgo_region: str = None,  # "en-us",
+        proxies: list[str] = None,
     ) -> Dict[str, Any]:
         """
         Find relevant images for a given query using DuckDuckGo.
@@ -117,24 +125,26 @@ class ImageFinder:
                 "duckduckgo_region": duckduckgo_region,
             }
 
-        #logger.info(f"Searching DuckDuckGo for images with query: {query}")
+        # logger.info(f"Searching DuckDuckGo for images with query: {query}")
 
         try:
             images: List[str] = []
             images_data_set: List[Dict[str, Any]] = []
-            results = await self.get_images_from_duckduckgo(query, max_images, proxies, duckduckgo_region)
-            if not results: 
+            results = await self.get_images_from_duckduckgo(
+                query, max_images, proxies, duckduckgo_region
+            )
+            if not results:
                 return {
-                "images": [],
-                "total_found": 0,
-                "images_data": [],
-                "search_method": "duckduckgo_error",
-                "query": query,
-                "duckduckgo_region": duckduckgo_region,
-            }           
-   
+                    "images": [],
+                    "total_found": 0,
+                    "images_data": [],
+                    "search_method": "duckduckgo_error",
+                    "query": query,
+                    "duckduckgo_region": duckduckgo_region,
+                }
+
             for item in results:
-                image_data = self._process_duckduckgo_image(item)                
+                image_data = self._process_duckduckgo_image(item)
                 if image_data and self._is_high_quality_image(image_data):
                     images.append(image_data.get("image"))
                     images_data_set.append(image_data)
@@ -179,18 +189,20 @@ class ImageFinder:
             logger.error(f"Error downloading image: {e}")
             return None
 
-    def _process_duckduckgo_image(self, item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def _process_duckduckgo_image(
+        self, item: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
         """Process a DuckDuckGo result into standardized format."""
         try:
-            image_data = item.get("image", "")           
+            image_data = item.get("image", "")
             width_data = item.get("width", 0)
             height_data = item.get("height", 0)
-            
+
             return {
-                "image": image_data,             
+                "image": image_data,
                 "width": width_data,
                 "height": height_data,
-            }            
+            }
         except Exception as e:
             logger.error(f"Error processing DuckDuckGo image: {e}")
             return None
@@ -211,11 +223,10 @@ class ImageFinder:
             if aspect_ratio < 0.5 or aspect_ratio > 3.0:
                 return False
 
-
             # Check format
             url = image_data.get("image", "")
             if not url or not url.startswith(("http://", "https://")):
-                return False            
+                return False
 
             return True
         except Exception as e:
@@ -226,7 +237,7 @@ class ImageFinder:
         """
         Generate search queries for finding relevant images.
         """
-        queries = []        
+        queries = []
 
         keywords = self._extract_keywords(extracted_data.entities)
         if keywords:
@@ -239,7 +250,7 @@ class ImageFinder:
 
         # Deduplicate
         return list(dict.fromkeys(queries))[:5]
-    
+
     def _extract_keywords(self, entities: Optional[EntityModel]) -> List[str]:
         """
         Extract keywords from entities for image search.
@@ -249,8 +260,15 @@ class ImageFinder:
             return []
 
         candidate_labels = [
-            "PERSON", "ORG", "GPE", "LOC", "EVENT", "LAW",
-            "NORP", "PRODUCT", "WORK_OF_ART"
+            "PERSON",
+            "ORG",
+            "GPE",
+            "LOC",
+            "EVENT",
+            "LAW",
+            "NORP",
+            "PRODUCT",
+            "WORK_OF_ART",
         ]
 
         # Collect (text, score) pairs
@@ -258,7 +276,7 @@ class ImageFinder:
         for label in candidate_labels:
             ents: List[EntityAttributes] = getattr(entities, label, []) or []
             for ent in ents:
-                if ent.score >= 0.85:  #threshold
+                if ent.score >= 0.85:  # threshold
                     text = ent.text.strip()
                     if 3 <= len(text) <= 40:
                         keywords_with_scores.append((text, ent.score))
@@ -276,8 +294,7 @@ class ImageFinder:
                 keywords.append(text)
 
         return keywords
-    
-    
+
     def _to_duckduckgo_region(self, lang: str, country: Optional[str] = None) -> str:
         """
         Convert language + optional country into DuckDuckGo region code.
@@ -299,7 +316,6 @@ class ImageFinder:
 
         return f"{region}-{lang}"
 
-    
     def _regions_for_language(self, lang: str) -> List[str]:
         """
         Return all ISO-3166 territory codes where a language is spoken
@@ -315,7 +331,9 @@ class ImageFinder:
 
         return result
 
-    def get_all_duckduckgo_regions(self, lang: str, country: Optional[str] = None) -> List[str]:
+    def get_all_duckduckgo_regions(
+        self, lang: str, country: Optional[str] = None
+    ) -> List[str]:
         """
         Generate all possible DuckDuckGo region codes for a given language (+optional country).
         Rules:
@@ -335,10 +353,9 @@ class ImageFinder:
             code = self._to_duckduckgo_region(lang, country)
             if code:
                 codes.add(code)
-           
 
         # 3) lang + regions inferred from Babel
-        if lang != "en":        
+        if lang != "en":
             regions = self._regions_for_language(lang)
             for region in regions:
                 code = self._to_duckduckgo_region(lang, region)
@@ -352,7 +369,6 @@ class ImageFinder:
                 codes.add(code)
 
         return sorted(codes)
-
 
 
 # Global instance

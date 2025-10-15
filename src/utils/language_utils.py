@@ -59,7 +59,7 @@ class LanguageUtils:
         if langs:
             identifier.set_languages(langs)
         return identifier
-    
+
     @staticmethod
     def is_valid_iso_639_code(code: str) -> bool:
         """Validate ISO-639 language codes with langcodes"""

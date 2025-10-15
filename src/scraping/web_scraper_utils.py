@@ -25,11 +25,12 @@ from urllib.parse import urljoin
 from typing import List
 from .error_patterns import ERROR_REGEX
 
+
 class WebScraperUtils:
     """
     This class handles all web scraping utility operations.
     """
-    
+
     @staticmethod
     def extract_image_urls(text: str) -> List[str]:
         """
@@ -44,16 +45,26 @@ class WebScraperUtils:
         urls = set()
 
         # Markdown images: ![alt](url)
-        urls.update(re.findall(r'!\[.*?\]\((https?://[^\s)]+)\)', text))
+        urls.update(re.findall(r"!\[.*?\]\((https?://[^\s)]+)\)", text))
 
         # HTML image tags: <img src="url">
         urls.update(re.findall(r'<img[^>]+src=["\'](https?://[^"\']+)["\']', text))
 
         # Direct image links (ending in jpg/png/gif/webp/jpeg)
-        urls.update(re.findall(r'(https?://[^\s]+?\.(?:jpg|jpeg|png|gif|webp))', text, re.IGNORECASE))
+        urls.update(
+            re.findall(
+                r"(https?://[^\s]+?\.(?:jpg|jpeg|png|gif|webp))", text, re.IGNORECASE
+            )
+        )
 
         # Relative or local paths (optional, depending on your input data)
-        urls.update(re.findall(r'src=["\']([^"\']+\.(?:jpg|jpeg|png|gif|webp))["\']', text, re.IGNORECASE))
+        urls.update(
+            re.findall(
+                r'src=["\']([^"\']+\.(?:jpg|jpeg|png|gif|webp))["\']',
+                text,
+                re.IGNORECASE,
+            )
+        )
 
         return list(urls)
 
@@ -96,8 +107,7 @@ class WebScraperUtils:
         text = re.sub(r"\n{2,}", "\n", text)
 
         return text.strip()
-    
-    
+
     @staticmethod
     def find_error_pattern(text: str) -> bool:
         """

@@ -60,7 +60,7 @@ class Crawl4AIExtractor:
         #     content_filter=prune_filter,
         #     options={"ignore_links": True, "ignore_images": True, "escape_html": True},
         # )
-        
+
         md_generator = DefaultMarkdownGenerator(
             content_filter=prune_filter,
             options={"ignore_links": True, "escape_html": True},
@@ -157,8 +157,8 @@ class Crawl4AIExtractor:
         config = CrawlerRunConfig(
             markdown_generator=md_generator,
             wait_for=generic_ready,
-            #wait_for_images=True,
-            #adjust_viewport_to_content=True,
+            # wait_for_images=True,
+            # adjust_viewport_to_content=True,
             # wait_for='js:() => !!document.querySelector("main, article, [role=\'main\'], .article, .article-body")',
             delay_before_return_html=2.5,  # <-- the “works in debug” delay, but explicit
             page_timeout=60000,  # ms — give slow SPAs time to settle
@@ -184,12 +184,11 @@ class Crawl4AIExtractor:
 
     async def crawl4ai_scrape(
         self, url: str, timeout_sec: int = 10  # maximum  10 seconds
-    )-> ExtractResult:
-
+    ) -> ExtractResult:
         try:
             from src.scraping import WebScraperUtils
-            
-            config = self._get_crawl4ai_config()            
+
+            config = self._get_crawl4ai_config()
             async with AsyncWebCrawler() as crawler:
                 result = await crawler.arun(url=url, config=config, timeout=timeout_sec)
             if not result:
@@ -199,16 +198,18 @@ class Crawl4AIExtractor:
                 raise RuntimeError(
                     f"Crawl failed with error: {result.error_message or 'unknown error'}"
                 )
-         
-            scrap_result: ExtractResult = await self.trafilatura_from_html(result.cleaned_html, url)            
+
+            scrap_result: ExtractResult = await self.trafilatura_from_html(
+                result.cleaned_html, url
+            )
             images = WebScraperUtils.extract_image_urls(scrap_result.content)
             scrap_result.images = images
             if WebScraperUtils.find_error_pattern(scrap_result.content):
-                scrap_result.content = "error_pattern_found"            
+                scrap_result.content = "error_pattern_found"
             cleaned = WebScraperUtils.remove_ui_junk(scrap_result.content)
-            
+
             scrap_result.content = cleaned
-            word_count=len(cleaned.split())
+            word_count = len(cleaned.split())
             scrap_result.word_count = word_count
             return scrap_result
 
@@ -231,14 +232,17 @@ class Crawl4AIExtractor:
         url: str,
         max_retries: int = 1,
         timeout_sec: int = 3600,  # maximum 1 minute
-    )-> ExtractResult:      
+    ) -> ExtractResult:
         from src.scraping import WebScraperUtils
+
         config = self._get_crawl4ai_config()
 
         for attempt in range(1, max_retries + 1):
             try:
                 async with AsyncWebCrawler() as crawler:
-                    result = await crawler.arun(url=url, config=config, timeout=timeout_sec)
+                    result = await crawler.arun(
+                        url=url, config=config, timeout=timeout_sec
+                    )
                 if not result:
                     raise RuntimeError("Crawler returned no result")
 
@@ -246,17 +250,18 @@ class Crawl4AIExtractor:
                     raise RuntimeError(
                         f"Crawl failed with error: {result.error_message or 'unknown error'}"
                     )
-            
-                scrap_result: ExtractResult = await self.trafilatura_from_html(result.cleaned_html, url)
-                #images = WebScraperUtils.extract_image_urls(scrap_result.content)
-                #scrap_result.images = images
+
+                scrap_result: ExtractResult = await self.trafilatura_from_html(
+                    result.cleaned_html, url
+                )
+                # images = WebScraperUtils.extract_image_urls(scrap_result.content)
+                # scrap_result.images = images
                 if WebScraperUtils.find_error_pattern(scrap_result.content):
                     scrap_result.content = "error_pattern_found"
                 cleaned = WebScraperUtils.remove_ui_junk(scrap_result.content)
-                
-                
+
                 scrap_result.content = cleaned
-                word_count=len(cleaned.split())
+                word_count = len(cleaned.split())
                 scrap_result.word_count = word_count
                 return scrap_result
 
@@ -277,23 +282,28 @@ class Crawl4AIExtractor:
             f"crawl4AI_extractor.py:Crawl4AIExtractor:All {max_retries} crawl attempts failed for URL: {url}"
         )
         return None
-    
+
     async def trafilatura_from_html(self, html: str, url: str) -> ExtractResult:
         try:
             from src.scraping import get_trafilatura_extractor
+
             trafilatura_extractor = get_trafilatura_extractor()
-            result: ExtractResult = await trafilatura_extractor.trafilatura_from_html(html, url)
+            result: ExtractResult = await trafilatura_extractor.trafilatura_from_html(
+                html, url
+            )
             return result
         except Exception as e:
             self.logger.error(f"Failed to scrape {url}: {e}")
             return None
-        
-        
+
     async def beautifulSoup_from_html(self, html: str, url: str) -> ExtractResult:
         try:
             from src.scraping import get_beautiful_soap_extractor
+
             beautiful_soap_extractor = get_beautiful_soap_extractor()
-            result: ExtractResult = await beautiful_soap_extractor.beautifulSoup_from_html(html, url)
+            result: ExtractResult = (
+                await beautiful_soap_extractor.beautifulSoup_from_html(html, url)
+            )
             return result
         except Exception as e:
             self.logger.error(f"Failed to scrape {url}: {e}")

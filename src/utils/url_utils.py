@@ -2,8 +2,8 @@ import hashlib
 import base64
 import re
 
-class URLUtils:
 
+class URLUtils:
     @staticmethod
     def generate_unique_code(url: str, length: int = 6) -> str:
         """

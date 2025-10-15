@@ -30,14 +30,14 @@ def check_environment():
         "SUPABASE_SERVICE_KEY",
         "DB_NAME",
         "DB_USER",
-        "DB_PASSWORD"
+        "DB_PASSWORD",
     ]
-    
+
     missing_vars = []
     for var in required_vars:
         if not getattr(settings, var.lower(), None):
             missing_vars.append(var)
-    
+
     if missing_vars:
         print("Error: Missing required environment variables:")
         for var in missing_vars:
@@ -45,7 +45,7 @@ def check_environment():
         print("\nPlease check your .env file or environment variables.")
         print("You can copy env.example to .env and configure it.")
         return False
-    
+
     return True
 
 
@@ -74,10 +74,10 @@ def main():
     """Main entry point for the application."""
     try:
         # Setup logging
-        
-        logger = get_service_logger(__name__) 
+
+        logger = get_service_logger(__name__)
         print_startup_info()
-        
+
         # Configure uvicorn
         uvicorn_config = {
             "app": "src.api.server:app",
@@ -89,11 +89,11 @@ def main():
             "reload_dirs": ["src"] if settings.debug else None,
             "workers": 1,  # Single worker for development, use multiple for production
         }
-        
+
         # Start the server
         logger.info("Starting MASX AI ETL CPU Pipeline server...")
         uvicorn.run(**uvicorn_config)
-        
+
     except KeyboardInterrupt:
         print("\n Server stopped by user")
         sys.exit(0)

@@ -35,6 +35,7 @@ settings = get_settings()
 
 class ScrapingError(Exception):
     """Custom exception for scraping-related errors."""
+
     pass
 
 
@@ -47,10 +48,12 @@ class TrafilaturaExtractor:
     """
 
     def __init__(self) -> None:
-        self.timeout = settings.request_timeout            # seconds
-        self.max_retries = 0        #settings.retry_attempts 
-        self.retry_delay = settings.retry_delay            # base seconds
-        self.min_chars = getattr(settings, "min_chars", 200)  # minimal content size to accept
+        self.timeout = settings.request_timeout  # seconds
+        self.max_retries = 0  # settings.retry_attempts
+        self.retry_delay = settings.retry_delay  # base seconds
+        self.min_chars = getattr(
+            settings, "min_chars", 200
+        )  # minimal content size to accept
 
         # Build a trafilatura config (optional but recommended)
         # Favor precision by default; tune if you want more recall.
@@ -64,10 +67,13 @@ class TrafilaturaExtractor:
         self._config = use_config()
 
         # User-Agent override: use your rotating UA (or leave default)
-        self._user_agent = getattr(settings, "default_user_agent", "masx-enrich/1.0 (+https://example.com)")
-        
+        self._user_agent = getattr(
+            settings, "default_user_agent", "masx-enrich/1.0 (+https://example.com)"
+        )
 
-    async def scrape_article(self, url: str, proxy: str, user_agent: Optional[str] = None) -> Dict[str, Any]:
+    async def scrape_article(
+        self, url: str, proxy: str, user_agent: Optional[str] = None
+    ) -> Dict[str, Any]:
         """
         Fetch and extract an article using trafilatura with retries.
 
@@ -90,50 +96,56 @@ class TrafilaturaExtractor:
         last_err: Optional[BaseException] = None
         if proxy:
             os.environ["http_proxy"] = f"http://{proxy}"
-            os.environ["https_proxy"] = f"https://{proxy}"       
-        
+            os.environ["https_proxy"] = f"https://{proxy}"
+
         for attempt in range(1 + self.max_retries):
             try:
-                
-                #resp = fetch_response(url, config=self._config)
-                
+                # resp = fetch_response(url, config=self._config)
+
                 # fetch_url is synchronous → wrap with to_thread to avoid blocking event loop
                 downloaded = await asyncio.wait_for(
                     asyncio.to_thread(trafilatura.fetch_url, url, config=self._config),
                     timeout=10,
-                )                
-                
+                )
+
                 if not downloaded:
                     downloaded = self.just_scrape(url, proxy)
                     if not downloaded:
                         raise ScrapingError("Empty response or blocked by site")
-                  
 
-                result: ExtractResult = await self.trafilatura_from_html(downloaded, url)
+                result: ExtractResult = await self.trafilatura_from_html(
+                    downloaded, url
+                )
                 logger.info(f"[trafilatura] success: {url} (words={result.word_count})")
                 return result
 
             except (asyncio.TimeoutError, ScrapingError) as e:
                 last_err = e
                 if attempt < self.max_retries - 1:
-                    delay = self.retry_delay * (2 ** attempt)
-                    logger.warning(f"[trafilatura] retry {attempt+1}/{self.max_retries} in {delay}s: {url} ({e})")
+                    delay = self.retry_delay * (2**attempt)
+                    logger.warning(
+                        f"[trafilatura] retry {attempt+1}/{self.max_retries} in {delay}s: {url} ({e})"
+                    )
                     await asyncio.sleep(delay)
                     continue
                 break
             except Exception as e:
                 last_err = e
                 if attempt < self.max_retries - 1:
-                    delay = self.retry_delay * (2 ** attempt)
-                    logger.error(f"[trafilatura] unexpected error, retry {attempt+1}/{self.max_retries} in {delay}s: {url} ({e})")
+                    delay = self.retry_delay * (2**attempt)
+                    logger.error(
+                        f"[trafilatura] unexpected error, retry {attempt+1}/{self.max_retries} in {delay}s: {url} ({e})"
+                    )
                     await asyncio.sleep(delay)
                     continue
-                break          
-        
+                break
+
         logger.error(f"[trafilatura] failed to scrape {url}: {last_err}")
         return None
-    
-    async def trafilatura_from_html(self, html: str, url: str) -> Optional[Dict[str, Any]]:
+
+    async def trafilatura_from_html(
+        self, html: str, url: str
+    ) -> Optional[Dict[str, Any]]:
         # Use JSON output to capture metadata
         # See: https://trafilatura.readthedocs.io/en/latest/usage-python.html#extract
         try:
@@ -156,8 +168,7 @@ class TrafilaturaExtractor:
                 raise ScrapingError("Trafilatura extraction returned no content")
 
             # if json_str:
-            #     json_str = normalize("NFC",json_str)  
-
+            #     json_str = normalize("NFC",json_str)
 
             # data = json.loads(json_str)
 
@@ -165,7 +176,7 @@ class TrafilaturaExtractor:
             content = (data.get("text") or "").strip()
             if WebScraperUtils.find_error_pattern(content):
                 content = "error_pattern_found"
-            
+
             # we will scrap not only content
             # but imgeas , title, author, published_date, metadata
             # if len(content) < self.min_chars:
@@ -182,7 +193,7 @@ class TrafilaturaExtractor:
                 "language": data.get("language"),
                 "sitename": data.get("sitename"),
                 "categories": data.get("categories"),
-                "links": data.get("links")
+                "links": data.get("links"),
             }
 
             result = ExtractResult(
@@ -201,17 +212,15 @@ class TrafilaturaExtractor:
         except Exception as e:
             self.logger.error(f"Failed to scrape {url}: {e}")
             return None
-       
-    
+
     def just_scrape(self, url, proxy):
         """
         Scrape the article using BeautifulSoup.
         """
         try:
             import requests
-            headers = {
-                "User-Agent": proxy
-            }
+
+            headers = {"User-Agent": proxy}
             # url = "https://baijiahao.baidu.com/s?id=1834495451984756877"
             response = requests.get(
                 url, headers=headers, timeout=self.timeout
@@ -222,7 +231,7 @@ class TrafilaturaExtractor:
         except Exception as e:
             self.logger.error(f"Failed to scrape {url}: {e}")
             return None
-    
+
     @staticmethod
     def _ensure_bytes(s: Union[str, bytes]) -> bytes:
         if isinstance(s, bytes):
@@ -252,6 +261,7 @@ class TrafilaturaExtractor:
 
 # Global instance + getter (mirrors your previous pattern)
 trafilatura_extractor = TrafilaturaExtractor()
+
 
 def get_trafilatura_extractor() -> TrafilaturaExtractor:
     return trafilatura_extractor

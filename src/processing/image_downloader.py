@@ -22,7 +22,7 @@ import posixpath
 import mimetypes
 from PIL import Image
 import pytesseract
-            
+
 import re
 import imghdr
 from urllib.parse import urlparse, urlunparse
@@ -42,16 +42,26 @@ class ImageDownloader:
     """
     Downloads images and saves them into Supabase storage bucket.
     """
-    
+
     IMAGE_EXTENSIONS = (
-        ".jpg", ".jpeg", ".png", ".gif", ".webp",
-        ".avif", ".svg", ".bmp", ".tiff", ".tif", ".ico", ".heic", ".heif"
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".gif",
+        ".webp",
+        ".avif",
+        ".svg",
+        ".bmp",
+        ".tiff",
+        ".tif",
+        ".ico",
+        ".heic",
+        ".heif",
     )
-    
+
     # Regex pattern: matches any of the extensions (case-insensitive)
     IMAGE_EXT_PATTERN = re.compile(
-        r"\.(?:jpg|jpeg|png|gif|webp|avif|svg|bmp|tiff?|ico|heic|heif)\b",
-        re.IGNORECASE
+        r"\.(?:jpg|jpeg|png|gif|webp|avif|svg|bmp|tiff?|ico|heic|heif)\b", re.IGNORECASE
     )
 
     def __init__(self) -> None:
@@ -63,13 +73,21 @@ class ImageDownloader:
         self.bucket_name: str = settings.supabase_image_bucket
 
         # Whether to return public or signed URL
-        self.use_signed_urls: bool = getattr(settings, "supabase_use_signed_urls", False) # remove this property
-        self.signed_url_expires_in: int = getattr(settings, "supabase_signed_url_expiry", 60 * 60)  # 1h
+        self.use_signed_urls: bool = getattr(
+            settings, "supabase_use_signed_urls", False
+        )  # remove this property
+        self.signed_url_expires_in: int = getattr(
+            settings, "supabase_signed_url_expiry", 60 * 60
+        )  # 1h
 
         # Network & safety
         self.timeout = httpx.Timeout(12.0)  # seconds
-        self.max_concurrency: int = getattr(settings, "image_download_max_concurrency", 4)
-        self.max_file_size: int = getattr(settings, "image_download_max_bytes", 5 * 1024 * 1024)  # 5MB
+        self.max_concurrency: int = getattr(
+            settings, "image_download_max_concurrency", 4
+        )
+        self.max_file_size: int = getattr(
+            settings, "image_download_max_bytes", 5 * 1024 * 1024
+        )  # 5MB
         self.allowed_schemes = {"http", "https"}
 
         # MIME & extension handling
@@ -84,7 +102,9 @@ class ImageDownloader:
 
     # ----------------- public API -----------------
 
-    async def download_images(self, date: str, flashpoint_id: str, extracted_data: ExtractResult) -> ExtractResult:
+    async def download_images(
+        self, date: str, flashpoint_id: str, extracted_data: ExtractResult
+    ) -> ExtractResult:
         """
         Download images to Supabase Storage and update extracted_data.images
         to point at Supabase URLs (public or signed per config).
@@ -100,10 +120,10 @@ class ImageDownloader:
             logger.info("Image downloading disabled via config; skipping.")
             return extracted_data
 
-        urls: List[str] = getattr(extracted_data, "images", []) or []        
-        
-        urls = [self._clean_image_url(url) for url in urls]        
-        
+        urls: List[str] = getattr(extracted_data, "images", []) or []
+
+        urls = [self._clean_image_url(url) for url in urls]
+
         if not urls:
             logger.info("No images on ExtractResult; nothing to download.")
             return extracted_data
@@ -111,38 +131,51 @@ class ImageDownloader:
         extract_id = getattr(extracted_data, "id", "unknown")
         path = f"{date}/{flashpoint_id.strip()}"
         sem = asyncio.Semaphore(self.max_concurrency)
-        
-        # Clear all files in the directory
-        #self._clear_directory(path)
 
-        async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as session:
+        # Clear all files in the directory
+        # self._clear_directory(path)
+
+        async with httpx.AsyncClient(
+            timeout=self.timeout, follow_redirects=True
+        ) as session:
             tasks = []
             for i, url in enumerate(urls):
                 filename = self._build_filename(i, extract_id, url)
                 bucket_path = posixpath.join(path, filename)
                 tasks.append(self._process_one(session, url, bucket_path, sem))
 
-            results: List[Tuple[str, Optional[str], Optional[str]]] = await asyncio.gather(*tasks, return_exceptions=False)
+            results: List[
+                Tuple[str, Optional[str], Optional[str]]
+            ] = await asyncio.gather(*tasks, return_exceptions=False)
 
         # Build result lists
         uploaded_urls: List[str] = []
         image_map: List[Dict[str, Any]] = []
 
         for src_url, stored_path, served_url in results:
-            
             if stored_path and served_url:
                 uploaded_urls.append(served_url)
-                image_map.append({"source": src_url, "bucket_path": stored_path, "served_url": served_url})
+                image_map.append(
+                    {
+                        "source": src_url,
+                        "bucket_path": stored_path,
+                        "served_url": served_url,
+                    }
+                )
             else:
                 # on failure, keep original URL to avoid emptying images entirely
-                #uploaded_urls.append(src_url)
-                image_map.append({"source": src_url, "bucket_path": None, "served_url": None})
+                # uploaded_urls.append(src_url)
+                image_map.append(
+                    {"source": src_url, "bucket_path": None, "served_url": None}
+                )
 
         # Mutate ExtractResult in-place in a conservative way
         try:
             extracted_data.images = uploaded_urls
         except Exception:
-            logger.warning("Could not assign uploaded URLs back to ExtractResult.images")
+            logger.warning(
+                "Could not assign uploaded URLs back to ExtractResult.images"
+            )
 
         # Non-breaking debug attachment (ok if the model has no such field)
         try:
@@ -151,7 +184,7 @@ class ImageDownloader:
             pass
 
         return extracted_data
-    
+
     def _clear_directory(self, path: str):
         """
         Clear all files in a directory on Supabase.
@@ -160,8 +193,8 @@ class ImageDownloader:
             existing_files = self.storage.from_(self.bucket_name).list(path)
             if existing_files:
                 for file_info in existing_files:
-                    if isinstance(file_info, dict) and 'name' in file_info:
-                        file_path = posixpath.join(path, file_info['name'])
+                    if isinstance(file_info, dict) and "name" in file_info:
+                        file_path = posixpath.join(path, file_info["name"])
                         self.storage.from_(self.bucket_name).remove([file_path])
                     elif isinstance(file_info, str):
                         file_path = posixpath.join(path, file_info)
@@ -195,35 +228,42 @@ class ImageDownloader:
                 content_type, content_length = await self._head_probe(session, url)
 
                 if content_length and content_length > self.max_file_size:
-                    logger.warning(f"Skip {url}: Content-Length={content_length} > {self.max_file_size}")
+                    logger.warning(
+                        f"Skip {url}: Content-Length={content_length} > {self.max_file_size}"
+                    )
                     return (url, None, None)
 
-                data, content_type = await self._download_bytes(session, url, content_type_hint=content_type)
+                data, content_type = await self._download_bytes(
+                    session, url, content_type_hint=content_type
+                )
                 if data is None:
                     return (url, None, None)
-                
-                
+
                 # --- Validate MIME and actual image bytes ---
                 # Quick MIME filter
                 if not content_type or "image" not in content_type.lower():
                     logger.warning(f"Skip {url}: not an image MIME ({content_type})")
                     return (url, None, None)
-                
+
                 # Magic header test
                 if not imghdr.what(None, h=data[:32]):
                     logger.warning(f"Skip {url}: invalid image header")
                     return (url, None, None)
-                
+
                 if not self._validate_image(data, url):
                     logger.warning(f"Skip {url}: image validation failed")
                     return (url, None, None)
 
                 if len(data) > self.max_file_size:
-                    logger.warning(f"Skip {url}: downloaded size {len(data)} > {self.max_file_size}")
+                    logger.warning(
+                        f"Skip {url}: downloaded size {len(data)} > {self.max_file_size}"
+                    )
                     return (url, None, None)
 
                 if not self._is_mime_allowed(content_type):
-                    logger.warning(f"Skip {url}: disallowed content-type={content_type}")
+                    logger.warning(
+                        f"Skip {url}: disallowed content-type={content_type}"
+                    )
                     return (url, None, None)
 
                 # Upload
@@ -251,7 +291,12 @@ class ImageDownloader:
         r = await session.get(url, timeout=timeout)
         r.raise_for_status()
 
-        content_type = r.headers.get("content-type") or content_type_hint or self._guess_mime_from_url(url) or "application/octet-stream"
+        content_type = (
+            r.headers.get("content-type")
+            or content_type_hint
+            or self._guess_mime_from_url(url)
+            or "application/octet-stream"
+        )
         data = r.content  # small cap enforced by self.max_file_size
         return data, content_type
 
@@ -294,7 +339,6 @@ class ImageDownloader:
 
         return None, None
 
-
     def _build_filename(self, index: int, extract_id: str, url: str) -> str:
         """
         Returns deterministic filename: img_{index}_{extract_id}.{ext}
@@ -311,7 +355,10 @@ class ImageDownloader:
         if ext and ext in self.IMAGE_EXTENSIONS:
             return ext
         # fallback by mime guess
-        guessed = mimetypes.guess_extension(self._guess_mime_from_url(url) or "") or self.default_ext
+        guessed = (
+            mimetypes.guess_extension(self._guess_mime_from_url(url) or "")
+            or self.default_ext
+        )
         # Normalize .jpe to .jpg
         return ".jpg" if guessed in (".jpe",) else guessed
 
@@ -328,8 +375,10 @@ class ImageDownloader:
     def _is_mime_allowed(self, content_type: Optional[str]) -> bool:
         if not content_type:
             return False
-        return any(content_type.startswith(prefix) for prefix in self.allowed_mime_prefixes)
-    
+        return any(
+            content_type.startswith(prefix) for prefix in self.allowed_mime_prefixes
+        )
+
     def _clean_image_url(self, url: str) -> str:
         """
         Clean CMS-style or extended image URLs by truncating after the first valid extension.
@@ -352,11 +401,15 @@ class ImageDownloader:
             parsed.scheme or "https",
             parsed.netloc,
             path,
-            "", "", ""  # drop params, query, fragment
+            "",
+            "",
+            "",  # drop params, query, fragment
         )
         return urlunparse(clean_parts)
 
-    async def _upload_bytes(self, bucket_path: str, data: bytes, content_type: str) -> Optional[str]:
+    async def _upload_bytes(
+        self, bucket_path: str, data: bytes, content_type: str
+    ) -> Optional[str]:
         """
         Upload to Supabase Storage. Returns stored path or None.
         Uses upsert=True to be idempotent across retries.
@@ -364,10 +417,10 @@ class ImageDownloader:
         try:
             # Note: "folders" are virtual; uploading to a path creates it.
             file_options = {
-                'content-type': content_type,
-                'upsert': 'true',
-                'cache-control': 'public, max-age=31536000'
-                }
+                "content-type": content_type,
+                "upsert": "true",
+                "cache-control": "public, max-age=31536000",
+            }
             resp = self.storage.from_(self.bucket_name).upload(
                 path=bucket_path,
                 file=data,
@@ -390,7 +443,9 @@ class ImageDownloader:
             bucket = self.storage.from_(self.bucket_name)
             if self.use_signed_urls:
                 # create_signed_url(path, expires_in) -> {'signedURL': '...'}
-                signed = bucket.create_signed_url(stored_path, self.signed_url_expires_in)
+                signed = bucket.create_signed_url(
+                    stored_path, self.signed_url_expires_in
+                )
                 if isinstance(signed, dict) and "signedURL" in signed:
                     return signed["signedURL"]
             # default to public
@@ -405,11 +460,10 @@ class ImageDownloader:
 
         # Fallback: construct typical public URL pattern (works if bucket is public)
         return f"{self.supabase_url}/storage/v1/object/public/{self.bucket_name}/{stored_path}"
-    
+
     def _validate_image(self, data: bytes, url: str) -> bool:
         # --- EXTRA FILTERS TO SKIP "This site can't be reached" IMAGES ---
         try:
-
             img = Image.open(io.BytesIO(data)).convert("RGB")
             arr = np.array(img)
             # 1. Skip mostly white/gray/blue placeholders
@@ -420,12 +474,14 @@ class ImageDownloader:
 
             # 2. Very low variance → plain background (no real image)
             if arr.std() < 15:
-                logger.warning(f"Skip {url}: very low variance image (likely placeholder)")
+                logger.warning(
+                    f"Skip {url}: very low variance image (likely placeholder)"
+                )
                 return False
 
             return True
             # 3. Detect generic “site can’t be reached” via OCR fallback
-            
+
             # text = pytesseract.image_to_string(img)
             # if re.search(r"site\s+can.?t\s+be\s+reached|ERR_CONNECTION", text, re.I):
             #     logger.warning(f"Skip {url}: detected error text '{text[:40]}...'")

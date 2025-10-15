@@ -6,4 +6,11 @@ from .news_content_extractor import NewsContentExtractor
 from .entity_tragger import EntityTagger
 from .image_downloader import ImageDownloader
 
-__all__ = ["TextCleaner", "Geotagger", "ImageFinder", "NewsContentExtractor", "EntityTagger", "ImageDownloader"]
+__all__ = [
+    "TextCleaner",
+    "Geotagger",
+    "ImageFinder",
+    "NewsContentExtractor",
+    "EntityTagger",
+    "ImageDownloader",
+]

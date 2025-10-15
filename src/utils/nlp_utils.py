@@ -10,6 +10,7 @@ class NlpUtils:
             self.nlp = spacy.load("xx-ent-wiki-sm")
         except Exception:
             import xx_ent_wiki_sm
+
             self.nlp = xx_ent_wiki_sm.load()
 
         # Ensure sentence splitting is available

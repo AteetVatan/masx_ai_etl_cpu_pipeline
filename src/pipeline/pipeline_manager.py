@@ -14,10 +14,23 @@ from datetime import datetime
 
 
 from src.db import db_connection, DatabaseError
-from src.processing import NewsContentExtractor, EntityTagger, TextCleaner, Geotagger, ImageFinder, ImageDownloader
+from src.processing import (
+    NewsContentExtractor,
+    EntityTagger,
+    TextCleaner,
+    Geotagger,
+    ImageFinder,
+    ImageDownloader,
+)
 from src.services import ProxyService, TranslationManager
 from src.config import get_service_logger, get_settings
-from src.models import FeedModel, ExtractResult, EntityModel, EntityAttributes, GeoEntity
+from src.models import (
+    FeedModel,
+    ExtractResult,
+    EntityModel,
+    EntityAttributes,
+    GeoEntity,
+)
 from src.utils import NlpUtils, LanguageUtils
 
 
@@ -58,7 +71,9 @@ class PipelineManager:
 
         logger.info("Pipeline manager initialized")
 
-    async def process_article(self, article_data: FeedModel, date: str) -> Dict[str, Any]:
+    async def process_article(
+        self, article_data: FeedModel, date: str
+    ) -> Dict[str, Any]:
         """
         Process a single article through the complete pipeline.
 
@@ -101,7 +116,9 @@ class PipelineManager:
             processing_steps.append("language_setting")
 
             # Step 3: Translate title
-            logger.debug(f"Step 3: Translating title and language detection for article {article_id}")
+            logger.debug(
+                f"Step 3: Translating title and language detection for article {article_id}"
+            )
             extracted_data = await self._translate_title(extracted_data)
             processing_steps.append("translation")
 
@@ -122,8 +139,12 @@ class PipelineManager:
 
             # Step 7: download images to supabase
             if len(extracted_data.images) > 0:
-                logger.debug(f"Step 7: Downloading images to supabase for article {article_id}")
-                extracted_data = await self._download_images(date, flashpoint_id, extracted_data)
+                logger.debug(
+                    f"Step 7: Downloading images to supabase for article {article_id}"
+                )
+                extracted_data = await self._download_images(
+                    date, flashpoint_id, extracted_data
+                )
                 processing_steps.append("image_download")
 
             # here update the article data with the extracted data
@@ -134,7 +155,11 @@ class PipelineManager:
             article_data.published_date = extracted_data.published_date
             article_data.content = extracted_data.content
             article_data.images = extracted_data.images
-            article_data.hostname = extracted_data.hostname if extracted_data.hostname else article_data.hostname
+            article_data.hostname = (
+                extracted_data.hostname
+                if extracted_data.hostname
+                else article_data.hostname
+            )
             article_data.entities = extracted_data.entities
             article_data.geo_entities = extracted_data.geo_entities
 
@@ -153,7 +178,9 @@ class PipelineManager:
                 "timestamp": datetime.utcnow().isoformat(),
             }
 
-            logger.info(f"Successfully processed article {article_id} in {processing_time:.2f}s")
+            logger.info(
+                f"Successfully processed article {article_id} in {processing_time:.2f}s"
+            )
             return result
 
         except Exception as e:
@@ -172,7 +199,9 @@ class PipelineManager:
                 "timestamp": datetime.utcnow().isoformat(),
             }
 
-    async def process_batch(self, article_data_list: List[FeedModel], date: str) -> Dict[str, Any]:
+    async def process_batch(
+        self, article_data_list: List[FeedModel], date: str
+    ) -> Dict[str, Any]:
         """
         Process a batch of articles in parallel with intelligent batching.
 
@@ -186,7 +215,9 @@ class PipelineManager:
         Returns:
             Dictionary containing batch processing results
         """
-        logger.info(f"Starting intelligent batch processing for {len(article_data_list)} articles")
+        logger.info(
+            f"Starting intelligent batch processing for {len(article_data_list)} articles"
+        )
 
         start_time = time.time()
         all_results = []
@@ -195,19 +226,29 @@ class PipelineManager:
 
         try:
             # Calculate optimal batch size based on CPU cores and available workers
-            optimal_batch_size = self._calculate_optimal_batch_size(len(article_data_list))
-            logger.info(f"Using batch size of {optimal_batch_size} articles per sub-batch")
+            optimal_batch_size = self._calculate_optimal_batch_size(
+                len(article_data_list)
+            )
+            logger.info(
+                f"Using batch size of {optimal_batch_size} articles per sub-batch"
+            )
 
             # Split articles into optimal sub-batches
-            sub_batches = self._create_sub_batches(article_data_list, optimal_batch_size)
+            sub_batches = self._create_sub_batches(
+                article_data_list, optimal_batch_size
+            )
             logger.info(f"Created {len(sub_batches)} sub-batches for processing")
 
             # Process each sub-batch sequentially to avoid resource contention
             for batch_idx, sub_batch in enumerate(sub_batches, 1):
-                logger.info(f"Processing sub-batch {batch_idx}/{len(sub_batches)} with {len(sub_batch)} articles")
+                logger.info(
+                    f"Processing sub-batch {batch_idx}/{len(sub_batches)} with {len(sub_batch)} articles"
+                )
 
                 batch_start_time = time.time()
-                batch_results = await self._process_sub_batch(sub_batch, date, batch_idx)
+                batch_results = await self._process_sub_batch(
+                    sub_batch, date, batch_idx
+                )
 
                 # Aggregate results
                 all_results.extend(batch_results["results"])
@@ -284,7 +325,9 @@ class PipelineManager:
             # For large workloads, use larger batches but cap at reasonable size
             return min(base_batch_size * 3, 100)
 
-    def _create_sub_batches(self, article_data_list: List[FeedModel], batch_size: int) -> List[List[FeedModel]]:
+    def _create_sub_batches(
+        self, article_data_list: List[FeedModel], batch_size: int
+    ) -> List[List[FeedModel]]:
         """
         Split article list into sub-batches of optimal size.
 
@@ -301,7 +344,9 @@ class PipelineManager:
             sub_batches.append(sub_batch)
         return sub_batches
 
-    async def _process_sub_batch(self, sub_batch: List[FeedModel], date: str, batch_idx: int) -> Dict[str, Any]:
+    async def _process_sub_batch(
+        self, sub_batch: List[FeedModel], date: str, batch_idx: int
+    ) -> Dict[str, Any]:
         """
         Process a single sub-batch of articles in parallel using asyncio.
 
@@ -320,7 +365,10 @@ class PipelineManager:
         # Create asyncio tasks for all articles in this sub-batch
         tasks = []
         for article_data in sub_batch:
-            task = asyncio.create_task(self.process_article(article_data, date), name=f"article_{article_data.id}")
+            task = asyncio.create_task(
+                self.process_article(article_data, date),
+                name=f"article_{article_data.id}",
+            )
             tasks.append(task)
 
         # Wait for all tasks in this sub-batch to complete
@@ -336,7 +384,9 @@ class PipelineManager:
                     failed += 1
                     results.append(
                         {
-                            "article_id": sub_batch[i].id if i < len(sub_batch) else "unknown",
+                            "article_id": sub_batch[i].id
+                            if i < len(sub_batch)
+                            else "unknown",
                             "status": "failed",
                             "processing_time": 0,
                             "processing_steps": [],
@@ -361,7 +411,9 @@ class PipelineManager:
                 failed += 1
                 results.append(
                     {
-                        "article_id": sub_batch[i].id if i < len(sub_batch) else "unknown",
+                        "article_id": sub_batch[i].id
+                        if i < len(sub_batch)
+                        else "unknown",
                         "status": "failed",
                         "processing_time": 0,
                         "processing_steps": [],
@@ -377,7 +429,9 @@ class PipelineManager:
         """Scrape article content with fallback."""
         try:
             # Try primary scraper first
-            extracted_data: ExtractResult = await self.news_content_extractor.extract_feed(extracted_data.url)
+            extracted_data: ExtractResult = (
+                await self.news_content_extractor.extract_feed(extracted_data.url)
+            )
             return extracted_data
         except Exception as e:
             logger.error(f"Fallback scraper also failed for {extracted_data.ur}: {e}")
@@ -448,7 +502,9 @@ class PipelineManager:
 
         proxies = await self.proxy_service.get_proxy_cache()
 
-        title_en = await self.translation_manager.translate(title, source=language, target="en", proxies=proxies)
+        title_en = await self.translation_manager.translate(
+            title, source=language, target="en", proxies=proxies
+        )
         extracted_data.title_en = title_en if title_en else ""
         return extracted_data
 
@@ -469,7 +525,9 @@ class PipelineManager:
 
         # processing_steps.append("geotagging")
         # Extract geographic entities
-        geo_entities: list[GeoEntity] = self.geotagger.extract_geographic_entities(title, content, locations)
+        geo_entities: list[GeoEntity] = self.geotagger.extract_geographic_entities(
+            title, content, locations
+        )
         extracted_data.geo_entities = geo_entities
 
         return extracted_data
@@ -503,24 +561,38 @@ class PipelineManager:
                 if extracted_data.title:
                     try:
                         images_data = await self.image_finder.find_images(
-                            extracted_data.title, max_images=10, proxies=proxies, duckduckgo_region=region
+                            extracted_data.title,
+                            max_images=10,
+                            proxies=proxies,
+                            duckduckgo_region=region,
                         )
                         if images_data.get("images"):
                             images.update(images_data.get("images"))
                             # images_data_set.extend(images_data.get("images_data"))
                     except Exception as e:
-                        logger.warning(f"Image search failed for title '{extracted_data.title}': {e}")
+                        logger.warning(
+                            f"Image search failed for title '{extracted_data.title}': {e}"
+                        )
 
-                if len(images) < 3 and extracted_data.language != "en" and extracted_data.title_en:
+                if (
+                    len(images) < 3
+                    and extracted_data.language != "en"
+                    and extracted_data.title_en
+                ):
                     if extracted_data.title_en:
                         try:
                             images_data = await self.image_finder.find_images(
-                                extracted_data.title_en, max_images=10, proxies=proxies, duckduckgo_region=region
+                                extracted_data.title_en,
+                                max_images=10,
+                                proxies=proxies,
+                                duckduckgo_region=region,
                             )
                             if images_data.get("images"):
                                 images.extend(images_data.get("images"))
                         except Exception as e:
-                            logger.warning(f"Image search failed for title_en '{extracted_data.title_en}': {e}")
+                            logger.warning(
+                                f"Image search failed for title_en '{extracted_data.title_en}': {e}"
+                            )
 
             # if len(images) < 3:
             #     for region in regions:
@@ -539,7 +611,9 @@ class PipelineManager:
             if len(images) > 0:
                 extracted_data.images.extend(list(images))
                 # remove  empty
-                extracted_data.images = [image for image in extracted_data.images if image]
+                extracted_data.images = [
+                    image for image in extracted_data.images if image
+                ]
 
             return extracted_data
         except Exception as e:
@@ -547,17 +621,23 @@ class PipelineManager:
             extracted_data.images = []
             return extracted_data
 
-    async def _download_images(self, date: str, flashpoint_id: str, extracted_data: ExtractResult) -> ExtractResult:
+    async def _download_images(
+        self, date: str, flashpoint_id: str, extracted_data: ExtractResult
+    ) -> ExtractResult:
         """Download images to supabase."""
         try:
-            extracted_data = await self.image_downloader.download_images(date, flashpoint_id, extracted_data)
+            extracted_data = await self.image_downloader.download_images(
+                date, flashpoint_id, extracted_data
+            )
 
         except Exception as e:
             logger.error(f"Image download failed: {e}")
             extracted_data.images = []
         return extracted_data
 
-    async def _fetch_articles_batch(self, article_ids: List[str]) -> List[Dict[str, Any]]:
+    async def _fetch_articles_batch(
+        self, article_ids: List[str]
+    ) -> List[Dict[str, Any]]:
         """Fetch articles from database by IDs."""
         try:
             # Connect to database if not already connected
@@ -604,8 +684,13 @@ class PipelineManager:
                 updates.append(update_data)
 
             if updates:
-                successful_updates, failed_updates = await db_connection.update_articles_batch(updates)
-                logger.info(f"Updated {successful_updates} articles, {failed_updates} failed")
+                (
+                    successful_updates,
+                    failed_updates,
+                ) = await db_connection.update_articles_batch(updates)
+                logger.info(
+                    f"Updated {successful_updates} articles, {failed_updates} failed"
+                )
 
         except DatabaseError as e:
             logger.error(f"Failed to update articles: {e}")
@@ -614,7 +699,9 @@ class PipelineManager:
     async def get_pipeline_stats(self) -> Dict[str, Any]:
         """Get comprehensive pipeline statistics."""
         return {
-            "pipeline_stats": {"note": "Statistics removed to avoid race conditions in parallel execution"},
+            "pipeline_stats": {
+                "note": "Statistics removed to avoid race conditions in parallel execution"
+            },
             "thread_pool_stats": {"note": "Statistics disabled for parallel execution"},
             "database_stats": await self._get_database_stats(),
             "uptime": 0.0,  # Statistics disabled, return 0.0 instead of string
@@ -633,7 +720,11 @@ class PipelineManager:
 
     async def health_check(self) -> Dict[str, Any]:
         """Perform comprehensive health check."""
-        health_status = {"overall": "healthy", "components": {}, "timestamp": datetime.utcnow().isoformat()}
+        health_status = {
+            "overall": "healthy",
+            "components": {},
+            "timestamp": datetime.utcnow().isoformat(),
+        }
 
         # Check database connection
         try:
@@ -641,15 +732,27 @@ class PipelineManager:
                 await db_connection.connect()
 
             await db_connection._test_client()
-            health_status["components"]["database"] = {"status": "healthy", "details": "Connected successfully"}
+            health_status["components"]["database"] = {
+                "status": "healthy",
+                "details": "Connected successfully",
+            }
         except Exception as e:
-            health_status["components"]["database"] = {"status": "unhealthy", "details": str(e)}
+            health_status["components"]["database"] = {
+                "status": "unhealthy",
+                "details": str(e),
+            }
             health_status["overall"] = "unhealthy"
 
         # Check processing modules
-        health_status["components"]["scraper"] = {"status": "healthy", "details": "Available"}
+        health_status["components"]["scraper"] = {
+            "status": "healthy",
+            "details": "Available",
+        }
 
-        health_status["components"]["text_cleaner"] = {"status": "healthy", "details": "Available"}
+        health_status["components"]["text_cleaner"] = {
+            "status": "healthy",
+            "details": "Available",
+        }
 
         health_status["components"]["geotagger"] = {
             "status": "healthy" if self.geotagger.enabled else "disabled",

@@ -6,4 +6,11 @@ from .trafilatura_extractor import get_trafilatura_extractor
 from .unwrapped_url_resolver import get_final_url
 from .error_patterns import ERROR_REGEX
 
-__all__ = ["get_beautiful_soap_extractor", "Crawl4AIExtractor", "WebScraperUtils", "get_trafilatura_extractor", "get_final_url", "ERROR_REGEX"]
+__all__ = [
+    "get_beautiful_soap_extractor",
+    "Crawl4AIExtractor",
+    "WebScraperUtils",
+    "get_trafilatura_extractor",
+    "get_final_url",
+    "ERROR_REGEX",
+]

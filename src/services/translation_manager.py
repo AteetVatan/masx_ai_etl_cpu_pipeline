@@ -1,4 +1,3 @@
-
 # translation_manager.py
 
 from __future__ import annotations
@@ -10,13 +9,13 @@ from random import choice
 import requests
 import os
 from deep_translator import (
-    GoogleTranslator,     # keyless (scrapes web)
-    PapagoTranslator,     # keyless (web), good for Asian langs
-    MyMemoryTranslator,       # keyless dictionary
-    LingueeTranslator,    # keyless dictionary
+    GoogleTranslator,  # keyless (scrapes web)
+    PapagoTranslator,  # keyless (web), good for Asian langs
+    MyMemoryTranslator,  # keyless dictionary
+    LingueeTranslator,  # keyless dictionary
 )
 
-   
+
 from src.utils import LanguageUtils
 
 
@@ -25,43 +24,50 @@ DEFAULT_TARGET = "en"
 FAIL_THRESHOLD = 3
 COOLDOWN_SEC = 120
 MAX_WORKERS = 4
-CACHE_SIZE = 100_000   # in-memory LRU entries
+CACHE_SIZE = 100_000  # in-memory LRU entries
 REQUEST_TIMEOUT = 12.0
 
 from enum import Enum
-    
+
+
 class Providers(Enum):
     GOOGLE = "google"
     MYMEMORY = "mymemory"
     FREEAPI = "freeapi"
-    
-from deep_translator.constants import  MY_MEMORY_LANGUAGES_TO_CODES 
 
+
+from deep_translator.constants import MY_MEMORY_LANGUAGES_TO_CODES
 
 
 class LanguageNotSupportedException(Exception):
     pass
 
+
 class LengthNotSupportedException(Exception):
     pass
+
 
 class Circuit:
     def __init__(self):
         self.fail_count = 0
         self.open_until = 0.0
         self.lock = threading.Lock()
+
     def allow(self) -> bool:
         with self.lock:
             return time.time() >= self.open_until
+
     def success(self):
         with self.lock:
             self.fail_count = 0
             self.open_until = 0.0
+
     def failure(self):
         with self.lock:
             self.fail_count += 1
             if self.fail_count >= FAIL_THRESHOLD:
                 self.open_until = time.time() + COOLDOWN_SEC
+
 
 class TranslationManager:
     _instance = None
@@ -96,28 +102,33 @@ class TranslationManager:
         }
 
         # circuits & locks
-        self.circuits: Dict[Providers, Circuit] = {k: Circuit() for k in self.providers_enabled}
-        self.providers_lock = threading.Lock()    
+        self.circuits: Dict[Providers, Circuit] = {
+            k: Circuit() for k in self.providers_enabled
+        }
+        self.providers_lock = threading.Lock()
 
         # LRU cache
         self._cache: "OrderedDict[Tuple[str,str,str], str]" = OrderedDict()
         self._cache_lock = threading.Lock()
-        
-             
-        
 
     # ------------------------- public -------------------------
-    async def translate(self, text: str, source: str = "auto", target: Optional[str] = None, proxies: Optional[List[str]] = None) -> str:
+    async def translate(
+        self,
+        text: str,
+        source: str = "auto",
+        target: Optional[str] = None,
+        proxies: Optional[List[str]] = None,
+    ) -> str:
         target = target or self.target
         key = (text.strip(), source, target)
-        
-        # proxy= choice(proxies)  
+
+        # proxy= choice(proxies)
         # if proxy:
         #     os.environ["http_proxy"] = f"http://{proxy}"
-        #     os.environ["https_proxy"] = f"http://{proxy}"  
-                    
+        #     os.environ["https_proxy"] = f"http://{proxy}"
+
         os.environ["http_proxy"] = ""
-        os.environ["https_proxy"] = "" 
+        os.environ["https_proxy"] = ""
 
         cached = self._cache_get(key)
         if cached is not None:
@@ -136,21 +147,23 @@ class TranslationManager:
             except Exception as e:
                 last_exc = e
                 continue
-        return None    
-    
+        return None
+
     def _detect_language_iso_code(self, text: str) -> str:
         return LanguageUtils.detect_language(text)
-    
+
     def _get_supported_language_dict(self, klass):
-        #{arabic: ar, french: fr, if 
+        # {arabic: ar, french: fr, if
         return klass.get_supported_languages(as_dict=True) or {}
-    
-    def _get_language_code_for_provider(self, provider: Providers, source: str, target: str) -> str:
+
+    def _get_language_code_for_provider(
+        self, provider: Providers, source: str, target: str
+    ) -> str:
         converted_source = None
         converted_target = None
-        
+
         if provider == Providers.MYMEMORY:
-            #mymemory supports BCP-47 Language Codes            
+            # mymemory supports BCP-47 Language Codes
             language_code_list = list(MY_MEMORY_LANGUAGES_TO_CODES.values())
             source, target = source.lower(), target.lower()
             for lang in language_code_list:
@@ -161,46 +174,58 @@ class TranslationManager:
                     converted_target = lang
                 if converted_source and converted_target:
                     break
-            return converted_source, converted_target       
-          
+            return converted_source, converted_target
+
         return converted_source, converted_target
 
     # --------------------- internal core ----------------------
-    async def _try_provider(self, provider: Providers, text: str, source: str = "auto", target: str ="en") -> Optional[str]:
+    async def _try_provider(
+        self, provider: Providers, text: str, source: str = "auto", target: str = "en"
+    ) -> Optional[str]:
         """
         Resolves the language of the text and the target language.
-        source and target are iso_639 codes        
-        """        
+        source and target are iso_639 codes
+        """
         try:
-            
             if source == "auto" or source.strip() == "":
                 source = self._detect_language_iso_code(text)
-            
-            #valtdate source and target
-            if not LanguageUtils.is_valid_iso_639_code(source) or not LanguageUtils.is_valid_iso_639_code(target):
-                raise RuntimeError(f"Invalid language ISO 639 code: {source} or {target}")
-            
+
+            # valtdate source and target
+            if not LanguageUtils.is_valid_iso_639_code(
+                source
+            ) or not LanguageUtils.is_valid_iso_639_code(target):
+                raise RuntimeError(
+                    f"Invalid language ISO 639 code: {source} or {target}"
+                )
+
             if provider == Providers.GOOGLE:
                 gt = GoogleTranslator(source=source, target=target)
                 language_dict = gt.get_supported_languages(as_dict=True) or {}
                 language_code_list = list(language_dict.values())
                 if source not in language_code_list or target not in language_code_list:
-                    raise LanguageNotSupportedException(f"Unsupported language: {source} or {target}")                
-                
-                out = gt.translate(text)                
+                    raise LanguageNotSupportedException(
+                        f"Unsupported language: {source} or {target}"
+                    )
+
+                out = gt.translate(text)
 
             elif provider == Providers.MYMEMORY:
                 if len(text) > 500:
-                    raise LengthNotSupportedException(f"Length not supported: {len(text)}")                
-                source, target = self._get_language_code_for_provider(Providers.MYMEMORY, source, target)
+                    raise LengthNotSupportedException(
+                        f"Length not supported: {len(text)}"
+                    )
+                source, target = self._get_language_code_for_provider(
+                    Providers.MYMEMORY, source, target
+                )
                 if not source or not target:
-                    raise LanguageNotSupportedException(f"Unsupported language: {source} or {target}")                
-                
+                    raise LanguageNotSupportedException(
+                        f"Unsupported language: {source} or {target}"
+                    )
+
                 tr = MyMemoryTranslator(source=source, target=target)
                 out = tr.translate(text)
 
-            elif provider == Providers.FREEAPI:                
-                
+            elif provider == Providers.FREEAPI:
                 out = self._freeapi_translate(text, source, target)
             else:
                 return None
@@ -219,8 +244,7 @@ class TranslationManager:
             if not self.circuits[provider].allow():
                 self._disable(provider)  # circuit opened → disable for session
             return None
-  
-    
+
     def _freeapi_translate(self, text: str, source: str, target: str) -> str:
         base = "https://ftapi.pythonanywhere.com/translate"
         params = {"dl": target, "text": text}
@@ -228,7 +252,7 @@ class TranslationManager:
             params["sl"] = source
 
         try:
-            sess = requests.Session()       
+            sess = requests.Session()
 
             # safe timeout instead of attribute (sess.timeout does not exist)
             resp = sess.get(base, params=params, timeout=self.timeout)
@@ -253,17 +277,19 @@ class TranslationManager:
 
     # --------------------- ordering / utils -------------------
     def _provider_order(self) -> List[Providers]:
-        #make this order random everytime
-       
-        import random       
-        
-        order = []        
-        if self.providers_enabled.get(Providers.GOOGLE):  order.append(Providers.GOOGLE)        
-        if self.providers_enabled.get(Providers.FREEAPI): order.append(Providers.FREEAPI)
-        if self.providers_enabled.get(Providers.MYMEMORY):    order.append(Providers.MYMEMORY)        
+        # make this order random everytime
+
+        import random
+
+        order = []
+        if self.providers_enabled.get(Providers.GOOGLE):
+            order.append(Providers.GOOGLE)
+        if self.providers_enabled.get(Providers.FREEAPI):
+            order.append(Providers.FREEAPI)
+        if self.providers_enabled.get(Providers.MYMEMORY):
+            order.append(Providers.MYMEMORY)
         random.shuffle(order)
         return order
-
 
     def _is_enabled(self, provider: Providers) -> bool:
         with self.providers_lock:
@@ -297,8 +323,7 @@ class TranslationManager:
                 self._cache.popitem(last=False)
 
 
-if __name__ == "__main__":   
-
+if __name__ == "__main__":
     tm = TranslationManager(
         target_lang="en",
         enable_google=True,
@@ -306,7 +331,7 @@ if __name__ == "__main__":
         enable_mymemory=True,
         enable_linguee=True,
         enable_freeapi=True,
-        timeout_sec=12.0
+        timeout_sec=12.0,
     )
 
     for txt in [

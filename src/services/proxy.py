@@ -76,7 +76,7 @@ class ProxyService:
     2. Retrieve available proxy lists
     3. Handle authentication and error responses
     """
-    
+
     _instance = None
     _lock: Lock = Lock()
 
@@ -86,24 +86,22 @@ class ProxyService:
                 cls._instance = super(ProxyService, cls).__new__(cls)
                 cls._instance._initialized = False
             return cls._instance
-        
+
     @classmethod
     def get_instance(cls):
         return cls()
-    
 
     def __init__(self):
         """Initialize the proxy service with configuration and logging."""
         if self._initialized:
             return
-        
+
         self.settings = get_settings()
         self.logger = get_service_logger("ProxyService")
         self._refresher_task = None
-        
+
         self._proxy_cache: List[str] = []
         self._proxy_cache_timestamp = None
-        
 
         # Validate required configuration
         if not self.settings.proxy_api_key:
@@ -125,16 +123,14 @@ class ProxyService:
 
         self.logger.info(f"ProxyService initialized with base URL: {self.base_url}")
         self._initialized = True
-    
-       
+
     async def get_proxy_cache(self) -> List[str]:
         """Get the proxy cache, refreshing if expired."""
-        if not self._proxy_cache:           
+        if not self._proxy_cache:
             self._proxy_cache = await self.__get_proxies()
 
-        return self._proxy_cache    
-    
-    
+        return self._proxy_cache
+
     async def _refresh(self):
         """Internal refresh method (safe)."""
         try:
@@ -145,7 +141,7 @@ class ProxyService:
                 self.logger.info("Proxy cache refreshed in background")
         except Exception as e:
             self.logger.error(f"Failed to refresh proxy cache: {e}")
-            
+
     async def start_proxy_refresher(self, interval: int = 180):
         """Run a background loop to refresh proxies every `interval` seconds (default: 3 minutes)."""
         self.logger.info(f"Starting proxy refresher (every {interval//60} min)...")
@@ -157,15 +153,14 @@ class ProxyService:
 
         # Fire and forget
         self._refresher_task = asyncio.create_task(_loop())
-  
-    async def stop_proxy_refresher(self):        
+
+    async def stop_proxy_refresher(self):
         if hasattr(self, "_refresher_task") and self._refresher_task:
             self.logger.info("Stopping proxy refresher...")
             self._refresher_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await self._refresher_task
             self.logger.info("Proxy refresher stopped.")
-            
 
     async def ping_start_proxy(self) -> ProxyStartResponse:
         """
@@ -193,7 +188,6 @@ class ProxyService:
                 async with session.post(
                     url, headers=self.headers, timeout=aiohttp.ClientTimeout(total=30)
                 ) as response:
-
                     if response.status == 200:
                         response_data = await response.json()
                         self.logger.info("Proxy refresh operation started successfully")
@@ -208,9 +202,8 @@ class ProxyService:
                             f"Proxy refresh status: {proxy_response.status}, "
                             f"Duration: {proxy_response.duration}"
                         )
-                        
+
                         await self.start_proxy_refresher(interval=180)
-                        
 
                         return proxy_response
 
@@ -278,7 +271,6 @@ class ProxyService:
                     headers=self.headers,
                     timeout=aiohttp.ClientTimeout(total=5 * 60),  # 5 minutes
                 ) as response:
-
                     if response.status == 200:
                         response_data = await response.json()
                         self.logger.info("Proxy list retrieved successfully")
@@ -390,5 +382,3 @@ class ProxyService:
             "headers_configured": bool(self.headers.get("X-API-Key")),
             "service_ready": bool(self.settings.proxy_api_key),
         }
-
-
