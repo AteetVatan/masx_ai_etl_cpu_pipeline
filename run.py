@@ -39,7 +39,7 @@ def check_environment():
             missing_vars.append(var)
     
     if missing_vars:
-        print("❌ Error: Missing required environment variables:")
+        print("Error: Missing required environment variables:")
         for var in missing_vars:
             print(f"   - {var}")
         print("\nPlease check your .env file or environment variables.")
@@ -51,7 +51,7 @@ def check_environment():
 
 def print_startup_info():
     """Print startup information."""
-    print("🚀 MASX AI ETL CPU Pipeline")
+    print("MASX AI ETL CPU Pipeline")
     print("=" * 50)
     print(f"Version: 1.0.0")
     print(f"Host: {settings.host}")
@@ -64,9 +64,9 @@ def print_startup_info():
     print(f"Geotagging: {settings.enable_geotagging}")
     print(f"Text Cleaning: {settings.clean_text}")
     print("=" * 50)
-    print(f"📖 API Documentation: http://{settings.host}:{settings.port}/docs")
-    print(f"🔍 Health Check: http://{settings.host}:{settings.port}/health")
-    print(f"📊 Statistics: http://{settings.host}:{settings.port}/stats")
+    print(f"API Documentation: http://{settings.host}:{settings.port}/docs")
+    print(f"Health Check: http://{settings.host}:{settings.port}/health")
+    print(f"Statistics: http://{settings.host}:{settings.port}/stats")
     print("=" * 50)
 
 
@@ -75,13 +75,7 @@ def main():
     try:
         # Setup logging
         
-        logger = get_service_logger(__name__)
-        
-        # Check environment
-        if not check_environment():
-            sys.exit(1)
-        
-        # Print startup information
+        logger = get_service_logger(__name__) 
         print_startup_info()
         
         # Configure uvicorn
@@ -101,10 +95,10 @@ def main():
         uvicorn.run(**uvicorn_config)
         
     except KeyboardInterrupt:
-        print("\n🛑 Server stopped by user")
+        print("\n Server stopped by user")
         sys.exit(0)
     except Exception as e:
-        print(f"❌ Error starting server: {e}")
+        print(f" Error starting server: {e}")
         logger.error(f"Failed to start server: {e}", exc_info=True)
         sys.exit(1)
 
