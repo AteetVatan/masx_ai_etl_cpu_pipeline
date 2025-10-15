@@ -27,7 +27,12 @@ torch==2.7.1
 # On Linux → pip installs pyicu from PyPI (which builds fine with libicu-dev).
 # On Windows → pip installs from your bundled wheel file.
 # https://github.com/cgohlke/pyicu-build/releases
-./third_party/pyicu-2.15.2-cp312-cp312-win_amd64.whl
+#./third_party/pyicu-2.15.2-cp312-cp312-win_amd64.whl
+
+
+# ICU: Linux builds from source, Windows uses release wheel
+pyicu>=2.15.2; platform_system != "Windows"
+https://github.com/AteetVatan/masx_ai_etl_cpu_pipeline/releases/download/masx-ai-pyicu-v1.0.0/pyicu-2.15.2-cp312-cp312-win_amd64.whl ; sys_platform == "win32"
 countrytagger==0.1.2
 pycountry==23.12.11
 
