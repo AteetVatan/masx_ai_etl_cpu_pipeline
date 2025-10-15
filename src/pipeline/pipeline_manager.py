@@ -55,14 +55,7 @@ class PipelineManager:
         asyncio.run(self.proxy_service.ping_start_proxy())
         
         
-        # Pipeline statistics
-        self.stats = {
-            "total_processed": 0,
-            "successful": 0,
-            "failed": 0,
-            "start_time": None,
-            "last_activity": None
-        }
+        # Note: Statistics removed to avoid race conditions in parallel execution
         
         
         logger.info("Pipeline manager initialized")
@@ -154,10 +147,7 @@ class PipelineManager:
             # Calculate processing time
             processing_time = time.time() - start_time
             
-            # Update statistics
-            self.stats["total_processed"] += 1
-            self.stats["successful"] += 1
-            self.stats["last_activity"] = datetime.utcnow()
+            # Statistics removed to avoid race conditions in parallel execution
             
             result = {
                 "article_id": article_id,
@@ -173,10 +163,7 @@ class PipelineManager:
             return result
             
         except Exception as e:
-            # Update statistics
-            self.stats["total_processed"] += 1
-            self.stats["failed"] += 1
-            self.stats["last_activity"] = datetime.utcnow()
+            # Statistics removed to avoid race conditions in parallel execution
             
             error_msg = f"Pipeline processing failed for article {article_id}: {str(e)}"
             logger.error(error_msg)
@@ -648,9 +635,9 @@ class PipelineManager:
     async def get_pipeline_stats(self) -> Dict[str, Any]:
         """Get comprehensive pipeline statistics."""
         return {
-            "pipeline_stats": self.stats,
+            "pipeline_stats": {"note": "Statistics removed to avoid race conditions in parallel execution"},
             "database_stats": await self._get_database_stats(),
-            "uptime": time.time() - (self.stats["start_time"] or time.time())
+            "uptime": "N/A - statistics disabled for parallel execution"
         }
     
     async def _get_database_stats(self) -> Dict[str, Any]:
