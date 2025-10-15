@@ -52,6 +52,7 @@ class PipelineManager:
         self.proxy_service = ProxyService.get_instance()
         self.nlp_utils = NlpUtils()
         
+      
         asyncio.run(self.proxy_service.ping_start_proxy())
         
         
@@ -70,6 +71,7 @@ class PipelineManager:
         Returns:
             Dictionary containing processing results
         """
+        
         article_id = article_data.id
         flashpoint_id = article_data.flashpoint_id
         url = article_data.url

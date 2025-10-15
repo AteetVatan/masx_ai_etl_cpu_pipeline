@@ -15,6 +15,7 @@ from ..pipeline.pipeline_manager import pipeline_manager
 from src.models import FeedModel
 from src.config import get_service_logger
 from src.utils import validate_and_raise
+from src.services import ProxyService
 
 logger = get_service_logger(__name__)
 
@@ -141,6 +142,10 @@ class FeedProcessor:
                 "failed": 0,
                 "processing_time": 0
             }
+            
+            proxy_service = ProxyService.get_instance()
+            await proxy_service.ping_start_proxy()
+            proxies = await proxy_service.get_proxy_cache()
             
             if batch_mode:
                 results = await self._process_feed_entries_batch(feed_entries)
@@ -332,7 +337,7 @@ class FeedProcessor:
                     "processing_time": (datetime.utcnow() - start_time).total_seconds()
                 }
                 
-            article_data_list = article_data_list[:5]
+            #article_data_list = article_data_list[:5]
             
             # Process articles in batch
             data_results = await pipeline_manager.process_batch(article_data_list, self.date)

@@ -12,13 +12,17 @@ bucket under:  <bucket>/<flashpoint_id>/<img_{n}_{extract_id}.{ext}>
 
 from __future__ import annotations
 from typing import List, Dict, Any, Optional, Tuple
-from io import BytesIO
+import numpy as np
+import io
 from urllib.parse import urlparse
 from url_normalize import url_normalize
 import asyncio
 import os
 import posixpath
 import mimetypes
+from PIL import Image
+import pytesseract
+            
 import re
 import imghdr
 from urllib.parse import urlparse, urlunparse
@@ -190,7 +194,7 @@ class ImageDownloader:
                 # HEAD first (if server supports) to check content-length & type
                 content_type, content_length = await self._head_probe(session, url)
 
-                if content_length is not None and content_length > self.max_file_size:
+                if content_length and content_length > self.max_file_size:
                     logger.warning(f"Skip {url}: Content-Length={content_length} > {self.max_file_size}")
                     return (url, None, None)
 
@@ -210,7 +214,9 @@ class ImageDownloader:
                     logger.warning(f"Skip {url}: invalid image header")
                     return (url, None, None)
                 
-                
+                if not self._validate_image(data, url):
+                    logger.warning(f"Skip {url}: image validation failed")
+                    return (url, None, None)
 
                 if len(data) > self.max_file_size:
                     logger.warning(f"Skip {url}: downloaded size {len(data)} > {self.max_file_size}")
@@ -399,3 +405,30 @@ class ImageDownloader:
 
         # Fallback: construct typical public URL pattern (works if bucket is public)
         return f"{self.supabase_url}/storage/v1/object/public/{self.bucket_name}/{stored_path}"
+    
+    def _validate_image(self, data: bytes, url: str) -> bool:
+        # --- EXTRA FILTERS TO SKIP "This site can't be reached" IMAGES ---
+        try:
+
+            img = Image.open(io.BytesIO(data)).convert("RGB")
+            arr = np.array(img)
+            # 1. Skip mostly white/gray/blue placeholders
+            mean_color = arr.mean(axis=(0, 1))
+            if np.all(mean_color > 220):  # almost white
+                logger.warning(f"Skip {url}: mostly blank/white placeholder")
+                return False
+
+            # 2. Very low variance → plain background (no real image)
+            if arr.std() < 15:
+                logger.warning(f"Skip {url}: very low variance image (likely placeholder)")
+                return False
+
+            return True
+            # 3. Detect generic “site can’t be reached” via OCR fallback
+            
+            # text = pytesseract.image_to_string(img)
+            # if re.search(r"site\s+can.?t\s+be\s+reached|ERR_CONNECTION", text, re.I):
+            #     logger.warning(f"Skip {url}: detected error text '{text[:40]}...'")
+            #     return (url, None, None)
+        except Exception as err:
+            logger.debug(f"OCR/image validation skipped: {err}")

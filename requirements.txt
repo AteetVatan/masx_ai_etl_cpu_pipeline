@@ -13,8 +13,6 @@ playwright>=1.46.0
 ddgs>=8.1.1
 
 
-
-
 # Remove-Item -Recurse -Force "C:\Users\ateet\AppData\Local\ms-playwright"
 # pip uninstall playwright -y
 # pip install playwright==1.46.0 #The -y flag is just a "yes to all prompts"
@@ -37,9 +35,11 @@ pycountry==23.12.11
 spacy==3.7.4
 xx-ent-wiki-sm @ https://github.com/explosion/spacy-models/releases/download/xx_ent_wiki_sm-3.7.0/xx_ent_wiki_sm-3.7.0.tar.gz
 
-# Image Search APIs
+# Image Processing + OCR
 requests==2.31.0
 Pillow>=10.4
+pytesseract>=0.3.13
+numpy>=1.26.4
 
 # urls
 url-normalize>=2.2.1

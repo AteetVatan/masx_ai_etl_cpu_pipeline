@@ -142,12 +142,9 @@ async def main(date: Optional[str] = None, flashpoint_id: Optional[str] = None):
         #test warmup
         await warmup_server(date)
         
-        #here i want to 
-        await process_feed_entries_by_date(date, batch_mode=True)
-            
         #test process
-        #await process_feed_entries_by_date(date)            
-            
+        await process_feed_entries_by_date(date, batch_mode=False)            
+       
         #test process-flashpoint
         await process_feed_entries_by_flashpoint_id(date, flashpoint_id)
             
