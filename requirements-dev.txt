@@ -1,0 +1,80 @@
+# Core API Framework
+fastapi>=0.115.0,<0.116.0
+uvicorn>=0.24.0,<0.25.0
+
+# Web Scraping
+trafilatura==1.12.0
+beautifulsoup4==4.13.4
+lxml>=5.3.0,<6.0
+crawl4ai>=0.7.4
+playwright>=1.46.0
+
+#Image search
+ddgs>=8.1.1
+
+
+# Remove-Item -Recurse -Force "C:\Users\ateet\AppData\Local\ms-playwright"
+# pip uninstall playwright -y
+# pip install playwright==1.46.0 #The -y flag is just a "yes to all prompts"
+# python -m playwright install chromium
+# setx PLAYWRIGHT_BROWSERS_PATH "C:\Users\ateet\AppData\Local\ms-playwright"
+
+# NLP and Geotagging
+transformers==4.35.2
+torch==2.7.1
+
+# Prebuilt wheel for Windows + Python 3.12 , pyicu required for countrytagger
+# On Linux → pip installs pyicu from PyPI (which builds fine with libicu-dev).
+# On Windows → pip installs from your bundled wheel file.
+# https://github.com/cgohlke/pyicu-build/releases
+#./third_party/pyicu-2.15.2-cp312-cp312-win_amd64.whl
+
+
+# ICU: Linux builds from source, Windows uses release wheel
+pyicu>=2.15.2; platform_system != "Windows"
+https://github.com/AteetVatan/masx_ai_etl_cpu_pipeline/releases/download/masx-ai-pyicu-v1.0.0/pyicu-2.15.2-cp312-cp312-win_amd64.whl ; sys_platform == "win32"
+countrytagger==0.1.2
+pycountry==23.12.11
+
+# spaCy + English NER model (pin same major/minor)
+spacy==3.7.4
+xx-ent-wiki-sm @ https://github.com/explosion/spacy-models/releases/download/xx_ent_wiki_sm-3.7.0/xx_ent_wiki_sm-3.7.0.tar.gz
+
+# Image Processing + OCR
+requests==2.31.0
+Pillow>=10.4
+pytesseract>=0.3.13
+numpy>=1.26.4
+
+# urls
+url-normalize>=2.2.1
+
+# Translation and Language Detection
+deep-translator>=1.11.4
+langid>=1.1.6
+lingua-language-detector>=1.1.0
+
+babel>=2.17.0
+
+# Database
+supabase>=2.3.0    # bumped to support httpx>=0.27
+psycopg2-binary==2.9.9
+asyncpg>=0.30.0
+
+# Config + Utils
+pydantic-settings==2.0.3
+loguru==0.7.2
+python-multipart==0.0.6
+
+# Logging and Configuration
+structlog==23.2.0
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-mock==3.12.0
+
+# Dev Tools
+black==23.11.0
+isort==5.12.0
+flake8==6.1.0

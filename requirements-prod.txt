@@ -39,8 +39,6 @@ pycountry==23.12.11
 # spaCy + English NER model (pin same major/minor)
 spacy==3.7.4
 #xx-ent-wiki-sm @ https://github.com/explosion/spacy-models/releases/download/xx_ent_wiki_sm-3.7.0/xx_ent_wiki_sm-3.7.0.tar.gz
-https://github.com/explosion/spacy-models/releases/download/xx_ent_wiki_sm-3.7.0/xx_ent_wiki_sm-3.7.0.tar.gz#egg=xx_ent_wiki_sm
-
 
 # Image Processing + OCR
 requests==2.31.0
