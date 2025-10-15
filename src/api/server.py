@@ -14,8 +14,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-import uvicorn
-
 from src.config import get_settings, get_api_logger
 from ..pipeline.pipeline_manager import pipeline_manager
 from src.db import db_connection, DatabaseClientAndPool
@@ -27,8 +25,6 @@ from ..processing.feed_processor import feed_processor
 from ..utils.date_validation import validate_and_raise, get_today_date
 
 
-
-
 logger = get_api_logger(__name__)
 settings = get_settings()
 
@@ -38,6 +34,7 @@ settings = get_settings()
 
 class HealthResponse(BaseModel):
     """Response model for health check."""
+
     overall: str
     components: Dict[str, Any]
     timestamp: str
@@ -45,6 +42,7 @@ class HealthResponse(BaseModel):
 
 class StatsResponse(BaseModel):
     """Response model for pipeline statistics."""
+
     pipeline_stats: Dict[str, Any]
     thread_pool_stats: Dict[str, Any]
     database_stats: Dict[str, Any]
@@ -53,6 +51,7 @@ class StatsResponse(BaseModel):
 
 class FeedWarmupResponse(BaseModel):
     """Response model for feed warm-up."""
+
     status: str
     date: str
     total_entries: int
@@ -62,6 +61,7 @@ class FeedWarmupResponse(BaseModel):
 
 class FeedProcessResponse(BaseModel):
     """Response model for feed processing."""
+
     status: str
     date: str
     total_entries: int
@@ -74,6 +74,7 @@ class FeedProcessResponse(BaseModel):
 
 class FeedProcessFlashpointResponse(BaseModel):
     """Response model for feed processing by flashpoint ID."""
+
     status: str
     date: str
     flashpoint_id: str
@@ -91,29 +92,30 @@ async def lifespan(app: FastAPI):
     """Manage application startup and shutdown."""
     # Startup
     logger.info("Starting MASX AI ETL CPU Pipeline server")
-    
+
     try:
         # Initialize database connection
         await db_connection.connect()
         logger.info("Database connection established")
-        
+
         # Initialize pipeline manager
         await pipeline_manager.health_check()
         logger.info("Pipeline manager initialized")
-        
+
         yield
-        
+
     finally:
         # Shutdown
         logger.info("Shutting down MASX AI ETL CPU Pipeline server")
-        
+
         # Shutdown pipeline manager
         await pipeline_manager.shutdown()
-        
+
         # Disconnect from database
         await db_connection.disconnect()
-        
+
         logger.info("Server shutdown completed")
+
 
 async def verify_api_key(request: Request):
     """
@@ -152,6 +154,8 @@ async def verify_api_key(request: Request):
         raise HTTPException(status_code=401, detail="Invalid API key")
 
     return True
+
+
 # Create FastAPI application
 app = FastAPI(
     title="MASX AI ETL CPU Pipeline",
@@ -160,7 +164,7 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
     dependencies=[Depends(verify_api_key)],
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 # Add middleware
@@ -185,6 +189,7 @@ async def get_db_client():
 
 # API Endpoints
 
+
 @app.get("/", response_model=Dict[str, str])
 async def root():
     """Root endpoint with API information."""
@@ -193,7 +198,7 @@ async def root():
         "version": "1.0.0",
         "docs": "/docs",
         "health": "/health",
-        "status": "operational"
+        "status": "operational",
     }
 
 
@@ -201,7 +206,7 @@ async def root():
 async def health_check():
     """
     Comprehensive health check endpoint.
-    
+
     Returns the health status of all system components including
     database, thread pool, and processing modules.
     """
@@ -217,7 +222,7 @@ async def health_check():
 async def get_stats():
     """
     Get comprehensive pipeline statistics.
-    
+
     Returns detailed statistics about processing performance,
     thread pool usage, and database operations.
     """
@@ -229,19 +234,17 @@ async def get_stats():
         raise HTTPException(status_code=500, detail=f"Failed to get stats: {str(e)}")
 
 
-
-
 @app.get("/text-cleaner/test")
 async def test_text_cleaner(text: str, language: str = "en"):
     """
     Test the text cleaner with sample text.
-    
+
     Useful for testing and debugging text cleaning functionality.
     """
     try:
         result = text_cleaner.clean_text(text, language)
         return result
-        
+
     except Exception as e:
         logger.error(f"Text cleaner test failed: {e}")
         raise HTTPException(status_code=500, detail=f"Text cleaner test failed: {str(e)}")
@@ -251,13 +254,13 @@ async def test_text_cleaner(text: str, language: str = "en"):
 async def test_geotagger(text: str, language: str = "en"):
     """
     Test the geotagger with sample text.
-    
+
     Useful for testing and debugging geotagging functionality.
     """
     try:
         result = geotagger.extract_geographic_entities(text, language)
         return result
-        
+
     except Exception as e:
         logger.error(f"Geotagger test failed: {e}")
         raise HTTPException(status_code=500, detail=f"Geotagger test failed: {str(e)}")
@@ -267,13 +270,13 @@ async def test_geotagger(text: str, language: str = "en"):
 async def test_image_finder(query: str, max_images: int = 3, language: str = "en"):
     """
     Test the image finder with a search query.
-    
+
     Useful for testing and debugging image search functionality.
     """
     try:
         result = await image_finder.find_images(query, max_images, language)
         return result
-        
+
     except Exception as e:
         logger.error(f"Image finder test failed: {e}")
         raise HTTPException(status_code=500, detail=f"Image finder test failed: {str(e)}")
@@ -281,14 +284,12 @@ async def test_image_finder(query: str, max_images: int = 3, language: str = "en
 
 # Feed Processing Endpoints
 
+
 @app.post("/feed/warmup", response_model=FeedWarmupResponse)
-async def warmup_feed_entries(
-    date: str = None,
-    db: DatabaseClientAndPool = Depends(get_db_client)
-):
+async def warmup_feed_entries(date: str = None, db: DatabaseClientAndPool = Depends(get_db_client)):
     """
     Warm up the server by loading feed entries for a specific date.
-    
+
     This endpoint loads all feed entries from the feed_entries_{date} table
     into memory for processing. If no date is provided, uses today's date.
     """
@@ -296,19 +297,19 @@ async def warmup_feed_entries(
         # Use today's date if not provided
         if not date:
             date = get_today_date()
-        
+
         # Validate date format
         try:
             validated_date = validate_and_raise(date, "date")
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
-        
+
         # Warm up the server
         feed_processor.set_date(validated_date)
         result = await feed_processor.warm_up_server()
-        
+
         return FeedWarmupResponse(**result)
-        
+
     except DatabaseError as e:
         logger.error(f"Database error during warm-up: {e}")
         raise HTTPException(status_code=404, detail=f"Table feed_entries_{date} not available")
@@ -318,13 +319,10 @@ async def warmup_feed_entries(
 
 
 @app.post("/feed/process", response_model=FeedProcessResponse)
-async def process_feed_entries(
-    date: str = None,
-    db: DatabaseClientAndPool = Depends(get_db_client)
-):
+async def process_feed_entries(date: str = None, db: DatabaseClientAndPool = Depends(get_db_client)):
     """
     Process all feed entries for a specific date.
-    
+
     This endpoint processes all feed entries from the feed_entries_{date} table
     through the complete pipeline: scrape → clean → geotag → find image → save to DB.
     If no date is provided, uses today's date.
@@ -333,19 +331,19 @@ async def process_feed_entries(
         # Use today's date if not provided
         if not date:
             date = get_today_date()
-        
+
         # Validate date format
         try:
             validated_date = validate_and_raise(date, "date")
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
-        
+
         # Process feed entries
         feed_processor.set_date(validated_date)
         result = await feed_processor.process_all_feed_entries()
-        
+
         return FeedProcessResponse(**result)
-        
+
     except DatabaseError as e:
         logger.error(f"Database error during processing: {e}")
         raise HTTPException(status_code=404, detail=f"Table feed_entries_{date} not available")
@@ -356,13 +354,11 @@ async def process_feed_entries(
 
 @app.post("/feed/process/flashpoint", response_model=FeedProcessFlashpointResponse)
 async def process_feed_entries_by_flashpoint(
-    date: str = None,
-    flashpoint_id: str = None,
-    db: DatabaseClientAndPool = Depends(get_db_client)
+    date: str = None, flashpoint_id: str = None, db: DatabaseClientAndPool = Depends(get_db_client)
 ):
     """
     Process feed entries for a specific date and flashpoint ID.
-    
+
     This endpoint processes feed entries from the feed_entries_{date} table
     filtered by flashpoint_id through the complete pipeline.
     If no date is provided, uses today's date.
@@ -371,23 +367,23 @@ async def process_feed_entries_by_flashpoint(
         # Use today's date if not provided
         if not date:
             date = get_today_date()
-        
+
         # Validate date format
         try:
             validated_date = validate_and_raise(date, "date")
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
-        
+
         # Validate flashpoint_id
         if not flashpoint_id:
             raise HTTPException(status_code=400, detail="flashpoint_id is required")
-        
+
         # Process feed entries by flashpoint ID
         feed_processor.set_date(validated_date)
         result = await feed_processor.process_feed_entries_by_flashpoint_id(flashpoint_id)
-        
+
         return FeedProcessFlashpointResponse(**result)
-        
+
     except DatabaseError as e:
         logger.error(f"Database error during processing: {e}")
         raise HTTPException(status_code=404, detail=f"Table feed_entries_{date} not available")
@@ -397,13 +393,10 @@ async def process_feed_entries_by_flashpoint(
 
 
 @app.get("/feed/entries/{date}")
-async def get_feed_entries(
-    date: str,
-    db: DatabaseClientAndPool = Depends(get_db_client)
-):
+async def get_feed_entries(date: str, db: DatabaseClientAndPool = Depends(get_db_client)):
     """
     Get loaded feed entries for a specific date.
-    
+
     Returns the feed entries that are currently loaded in memory for the specified date.
     """
     try:
@@ -412,17 +405,13 @@ async def get_feed_entries(
             validated_date = validate_and_raise(date, "date")
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
-        
+
         # Get feed entries from memory
         feed_processor.set_date(validated_date)
         feed_entries = feed_processor.get_feed_entries()
-        
-        return {
-            "date": validated_date,
-            "total_entries": len(feed_entries),
-            "entries": feed_entries
-        }
-        
+
+        return {"date": validated_date, "total_entries": len(feed_entries), "entries": feed_entries}
+
     except Exception as e:
         logger.error(f"Error getting feed entries: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get feed entries: {str(e)}")
@@ -432,14 +421,14 @@ async def get_feed_entries(
 async def get_feed_stats():
     """
     Get feed processing statistics.
-    
+
     Returns comprehensive statistics about feed processing including
     loaded entries, processing counts, and performance metrics.
     """
     try:
         stats = feed_processor.get_processing_stats()
         return stats
-        
+
     except Exception as e:
         logger.error(f"Error getting feed stats: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get feed stats: {str(e)}")
@@ -449,7 +438,7 @@ async def get_feed_stats():
 async def clear_feed_entries(date: str):
     """
     Clear feed entries from memory for a specific date.
-    
+
     This endpoint removes the loaded feed entries from memory to free up resources.
     """
     try:
@@ -458,16 +447,16 @@ async def clear_feed_entries(date: str):
             validated_date = validate_and_raise(date, "date")
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
-        
+
         # Clear feed entries
         feed_processor.clear_feed_entries(validated_date)
-        
+
         return {
             "message": f"Cleared feed entries for date {validated_date}",
             "date": validated_date,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.utcnow().isoformat(),
         }
-        
+
     except Exception as e:
         logger.error(f"Error clearing feed entries: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to clear feed entries: {str(e)}")
@@ -477,23 +466,18 @@ async def clear_feed_entries(date: str):
 async def clear_all_feed_entries():
     """
     Clear all feed entries from memory.
-    
+
     This endpoint removes all loaded feed entries from memory to free up resources.
     """
     try:
         # Clear all feed entries
         feed_processor.clear_feed_entries()
-        
-        return {
-            "message": "Cleared all feed entries from memory",
-            "timestamp": datetime.utcnow().isoformat()
-        }
-        
+
+        return {"message": "Cleared all feed entries from memory", "timestamp": datetime.utcnow().isoformat()}
+
     except Exception as e:
         logger.error(f"Error clearing all feed entries: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to clear feed entries: {str(e)}")
-
-
 
 
 # Global exception handler
@@ -501,9 +485,4 @@ async def clear_all_feed_entries():
 async def global_exception_handler(request, exc):
     """Global exception handler for unhandled errors."""
     logger.error(f"Unhandled exception: {exc}", exc_info=True)
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "Internal server error", "type": "internal_error"}
-    )
-
-
+    return JSONResponse(status_code=500, content={"detail": "Internal server error", "type": "internal_error"})
