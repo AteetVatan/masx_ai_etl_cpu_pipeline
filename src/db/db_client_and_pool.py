@@ -40,27 +40,7 @@ class DatabaseClientAndPool:
         self._max_retries = self.settings.retry_attempts
         self._retry_delay = self.settings.retry_delay     
         self._test_table = "test_table"
-        self.logger = get_service_logger(__name__)        
-        self._date = None
-        self._table_name = None
-           
-    @property
-    def date(self) -> str:
-        if not self._date:
-            self._date = datetime.now().strftime("%Y-%m-%d")
-        return self._date
-    
-    @date.setter
-    def date(self, value: str) -> None:
-        value = validate_and_raise(value, "date")
-        self._date = value
-        self._table_name = format_date_for_table(self.date)
-    
-    @property
-    def table_name(self) -> str:
-        if not self._table_name:
-            self._table_name = format_date_for_table(self.date)
-        return self._table_name
+        self.logger = get_service_logger(__name__)
     
    
     async def connect(self) -> None:
@@ -160,7 +140,7 @@ class DatabaseClientAndPool:
         except Exception as e:
             self.logger.error(f"Error closing database connections: {e}")
     
-    async def fetch_feed_entries(self) -> List[Dict[str, Any]]:
+    async def fetch_feed_entries(self, date: str) -> List[Dict[str, Any]]:
         """
         Fetch all feed entries for a specific date.
         
@@ -176,10 +156,12 @@ class DatabaseClientAndPool:
         """
         if not self.client:
             raise ConnectionError("Database client not connected")
-               
+        
+        # Validate date format
+        date = validate_and_raise(date, "date")
         
         try:
-            table_name = format_date_for_table(self.date)
+            table_name = format_date_for_table(date)
             
             # Try to fetch all entries from the table
             # If table doesn't exist, Supabase will return an error
@@ -195,12 +177,12 @@ class DatabaseClientAndPool:
         except Exception as e:
             error_msg = str(e)
             if "relation" in error_msg.lower() and "does not exist" in error_msg.lower():
-                raise DatabaseError(f"Table feed_entries_{self.date} not available")
+                raise DatabaseError(f"Table feed_entries_{date} not available")
             else:
-                self.logger.error(f"Failed to fetch feed entries for date {self.date}: {e}")
-                raise DatabaseError(f"Failed to fetch feed entries for date {self.date}: {e}")
+                self.logger.error(f"Failed to fetch feed entries for date {date}: {e}")
+                raise DatabaseError(f"Failed to fetch feed entries for date {date}: {e}")
     
-    async def fetch_feed_entries_by_flashpoint_id(self, flashpoint_id: str) -> List[Dict[str, Any]]:
+    async def fetch_feed_entries_by_flashpoint_id(self, date: str, flashpoint_id: str) -> List[Dict[str, Any]]:
         """
         Fetch feed entries for a specific date and flashpoint_id.
         
@@ -218,10 +200,11 @@ class DatabaseClientAndPool:
         if not self.client:
             raise ConnectionError("Database client not connected")
         
-
+        # Validate date format
+        date = validate_and_raise(date, "date")
         
         try:
-            table_name = format_date_for_table(self.date)
+            table_name = format_date_for_table(date)
             
             # Try to fetch entries filtered by flashpoint_id
             # If table doesn't exist, Supabase will return an error
@@ -237,10 +220,10 @@ class DatabaseClientAndPool:
         except Exception as e:
             error_msg = str(e)
             if "relation" in error_msg.lower() and "does not exist" in error_msg.lower():
-                raise DatabaseError(f"Table feed_entries_{self.date} not available")
+                raise DatabaseError(f"Table feed_entries_{date} not available")
             else:
-                self.logger.error(f"Failed to fetch feed entries for date {self.date} and flashpoint_id {flashpoint_id}: {e}")
-                raise DatabaseError(f"Failed to fetch feed entries for date {self.date} and flashpoint_id {flashpoint_id}: {e}")
+                self.logger.error(f"Failed to fetch feed entries for date {date} and flashpoint_id {flashpoint_id}: {e}")
+                raise DatabaseError(f"Failed to fetch feed entries for date {date} and flashpoint_id {flashpoint_id}: {e}")
 
     async def fetch_articles_batch(
         self, 
@@ -429,12 +412,13 @@ class DatabaseClientAndPool:
             self.logger.error(f"Failed to update article {article_id} status: {e}")
             return False
     
-    async def update_processed_article(self, enriched_data: FeedModel) -> bool:
+    async def update_processed_article(self, enriched_data: FeedModel, date: str) -> bool:
         """
         Update processed article data back to the feed_entries table.
 
         Args:            
             enriched_data (FeedModel): Processed and enriched article data
+            date: Date in YYYY-MM-DD format
                 
         Returns:
             bool: True if save successful, False otherwise
@@ -442,8 +426,11 @@ class DatabaseClientAndPool:
         if not self.client:
             raise ConnectionError("Database client not connected")
         
+        # Validate date format
+        date = validate_and_raise(date, "date")
+        
         try:
-            table_name = format_date_for_table(self.date)
+            table_name = format_date_for_table(date)
 
             # Prepare article data for saving (only include schema-valid fields)
             article_data = {
