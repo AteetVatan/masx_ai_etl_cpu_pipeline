@@ -29,6 +29,7 @@ from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from threading import Lock
+import contextlib
 
 from src.config import get_settings, get_service_logger
 from src.core.exceptions import ServiceException
@@ -98,8 +99,9 @@ class ProxyService:
         
         self.settings = get_settings()
         self.logger = get_service_logger("ProxyService")
+        self._refresher_task = None
         
-        self._proxy_cache = []
+        self._proxy_cache: List[str] = []
         self._proxy_cache_timestamp = None
         
 
@@ -154,9 +156,16 @@ class ProxyService:
                 await asyncio.sleep(interval)
 
         # Fire and forget
-        asyncio.create_task(_loop())
+        self._refresher_task = asyncio.create_task(_loop())
   
-
+    async def stop_proxy_refresher(self):        
+        if hasattr(self, "_refresher_task") and self._refresher_task:
+            self.logger.info("Stopping proxy refresher...")
+            self._refresher_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._refresher_task
+            self.logger.info("Proxy refresher stopped.")
+            
 
     async def ping_start_proxy(self) -> ProxyStartResponse:
         """
@@ -297,7 +306,7 @@ class ProxyService:
                             return []
 
                         # Cache proxies
-                        self.proxy_cache = proxy_response.data
+                        self._proxy_cache = proxy_response.data
 
                         # Return proxy list
                         return proxy_response.data
