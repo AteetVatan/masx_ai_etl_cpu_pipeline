@@ -38,15 +38,7 @@ class Settings(BaseSettings):
     database_min_connections: int = Field(
         default=1, description="Minimum number of database connections"
     )
-    
-    
-    
-    
-    
-    
-    # API Keys
-    bing_search_api_key: Optional[str] = Field(default=None, description="Bing Search API key")
-    duckduckgo_api_key: Optional[str] = Field(default=None, description="DuckDuckGo API key")
+ 
     
     # Pipeline Configuration
     max_workers: int = Field(
@@ -73,6 +65,14 @@ class Settings(BaseSettings):
     clean_text: bool = Field(default=True, description="Enable text cleaning")
     max_article_length: int = Field(default=50000, description="Maximum article length")
     
+    
+    # Image processing settings
+    enable_image_download: bool = Field(default=True, description="Enable image download")
+    image_download_max_concurrency: int = Field(default=4, description="Maximum image download concurrency")
+    image_download_max_bytes: int = Field(default=5242880, description="Maximum image download bytes")
+    supabase_use_signed_urls: bool = Field(default=False, description="Use signed URLs for Supabase")
+    supabase_signed_url_expiry: int = Field(default=3600, description="Supabase signed URL expiry")
+
     
     # Proxy Configuration
     proxy_api_key: Optional[str] = Field(default=None, description="Proxy API key")
