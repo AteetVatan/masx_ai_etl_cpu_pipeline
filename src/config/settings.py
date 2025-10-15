@@ -19,7 +19,13 @@ class Settings(BaseSettings):
     #supabase_anon_key: str = Field(..., description="Supabase anon key")
     #supabase_service_role_key: str = Field(..., description="Supabase service key")
     
+    
+    # Server Configuration
     api_key: str = Field(default="", description="API key")
+    require_api_key: bool = Field(default=False, description="Require API key for requests")
+    host: str = Field(default="0.0.0.0", description="Server host")
+    port: int = Field(default=8000, description="Server port")
+    debug: bool = Field(default=False, description="Debug mode")    
     
     # Database Configuration (Supabase)
     supabase_url: str = Field(default="", description="Supabase project URL")
@@ -54,10 +60,6 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO", description="Logging level")
     log_format: str = Field(default="json", description="Log format (json or text)")
     
-    # Server Configuration
-    host: str = Field(default="0.0.0.0", description="Server host")
-    port: int = Field(default=8000, description="Server port")
-    debug: bool = Field(default=False, description="Debug mode")
     
     # Processing Configuration
     enable_image_search: bool = Field(default=True, description="Enable image search")
