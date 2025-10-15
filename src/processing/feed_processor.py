@@ -257,11 +257,11 @@ class FeedProcessor:
     
     async def _load_feed_entries(self) -> List[Dict[str, Any]]:
         """Load feed entries for a specific date."""
-        return await db_connection.fetch_feed_entries()
+        return await db_connection.fetch_feed_entries(self.date)
     
     async def _load_feed_entries_by_flashpoint_id(self, flashpoint_id: str) -> List[Dict[str, Any]]:
         """Load feed entries for a specific date and flashpoint_id."""
-        return await db_connection.fetch_feed_entries_by_flashpoint_id(flashpoint_id)
+        return await db_connection.fetch_feed_entries_by_flashpoint_id(self.date, flashpoint_id)
     
     async def _process_feed_entries(self, feed_entries: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Process a list of feed entries through the pipeline."""
@@ -280,7 +280,7 @@ class FeedProcessor:
                 if result["status"] == "completed":
                     # Save processed article to database
                     enriched_data: FeedModel = result["enriched_data"]
-                    save_success = await db_connection.update_processed_article(enriched_data)
+                    save_success = await db_connection.update_processed_article(enriched_data, self.date)
                     
                     if save_success:
                         successful += 1
@@ -332,7 +332,7 @@ class FeedProcessor:
                     "processing_time": (datetime.utcnow() - start_time).total_seconds()
                 }
                 
-            #article_data_list = article_data_list[:3]
+            article_data_list = article_data_list[:5]
             
             # Process articles in batch
             data_results = await pipeline_manager.process_batch(article_data_list, self.date)
@@ -346,7 +346,7 @@ class FeedProcessor:
                         if result["status"] == "completed":
                             # Save processed article to database
                             enriched_data: FeedModel = result["enriched_data"]
-                            save_success = await db_connection.update_processed_article(enriched_data)
+                            save_success = await db_connection.update_processed_article(enriched_data, self.date)
                             
                             if save_success:
                                 successful += 1
