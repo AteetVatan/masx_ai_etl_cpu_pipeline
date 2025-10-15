@@ -9,7 +9,7 @@ from typing import Dict, Any
 from datetime import datetime
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Depends, Request
+from fastapi import FastAPI, HTTPException, Depends, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
@@ -48,6 +48,8 @@ class StatsResponse(BaseModel):
     database_stats: Dict[str, Any]
     uptime: float
 
+class FeedWarmupRequest(BaseModel):
+    date: str | None = None
 
 class FeedWarmupResponse(BaseModel):
     """Response model for feed warm-up."""
@@ -57,21 +59,31 @@ class FeedWarmupResponse(BaseModel):
     total_entries: int
     message: str
     timestamp: str
-
-
+    
+class FeedProcessRequest(BaseModel):
+    date: str | None = None    
+    flashpoints: list[str] | None = None
+    trigger: str | None = None
+ 
+    
 class FeedProcessResponse(BaseModel):
     """Response model for feed processing."""
+    
 
     status: str
+    message: str
     date: str
     total_entries: int
     successful: int
     failed: int
-    processing_time: float
-    message: str
+    processing_time: float    
     timestamp: str
 
-
+class FeedProcessFlashpointRequest(BaseModel):
+    date: str | None = None
+    flashpoint_id: str | None = None
+    trigger: str | None = None
+    
 class FeedProcessFlashpointResponse(BaseModel):
     """Response model for feed processing by flashpoint ID."""
 
@@ -234,59 +246,59 @@ async def get_stats():
         raise HTTPException(status_code=500, detail=f"Failed to get stats: {str(e)}")
 
 
-@app.get("/text-cleaner/test")
-async def test_text_cleaner(text: str, language: str = "en"):
-    """
-    Test the text cleaner with sample text.
+# @app.get("/text-cleaner/test")
+# async def test_text_cleaner(text: str, language: str = "en"):
+#     """
+#     Test the text cleaner with sample text.
 
-    Useful for testing and debugging text cleaning functionality.
-    """
-    try:
-        result = text_cleaner.clean_text(text, language)
-        return result
+#     Useful for testing and debugging text cleaning functionality.
+#     """
+#     try:
+#         result = text_cleaner.clean_text(text, language)
+#         return result
 
-    except Exception as e:
-        logger.error(f"Text cleaner test failed: {e}")
-        raise HTTPException(status_code=500, detail=f"Text cleaner test failed: {str(e)}")
-
-
-@app.get("/geotagger/test")
-async def test_geotagger(text: str, language: str = "en"):
-    """
-    Test the geotagger with sample text.
-
-    Useful for testing and debugging geotagging functionality.
-    """
-    try:
-        result = geotagger.extract_geographic_entities(text, language)
-        return result
-
-    except Exception as e:
-        logger.error(f"Geotagger test failed: {e}")
-        raise HTTPException(status_code=500, detail=f"Geotagger test failed: {str(e)}")
+#     except Exception as e:
+#         logger.error(f"Text cleaner test failed: {e}")
+#         raise HTTPException(status_code=500, detail=f"Text cleaner test failed: {str(e)}")
 
 
-@app.get("/image-finder/test")
-async def test_image_finder(query: str, max_images: int = 3, language: str = "en"):
-    """
-    Test the image finder with a search query.
+# @app.get("/geotagger/test")
+# async def test_geotagger(text: str, language: str = "en"):
+#     """
+#     Test the geotagger with sample text.
 
-    Useful for testing and debugging image search functionality.
-    """
-    try:
-        result = await image_finder.find_images(query, max_images, language)
-        return result
+#     Useful for testing and debugging geotagging functionality.
+#     """
+#     try:
+#         result = geotagger.extract_geographic_entities(text, language)
+#         return result
 
-    except Exception as e:
-        logger.error(f"Image finder test failed: {e}")
-        raise HTTPException(status_code=500, detail=f"Image finder test failed: {str(e)}")
+#     except Exception as e:
+#         logger.error(f"Geotagger test failed: {e}")
+#         raise HTTPException(status_code=500, detail=f"Geotagger test failed: {str(e)}")
+
+
+# @app.get("/image-finder/test")
+# async def test_image_finder(query: str, max_images: int = 3, language: str = "en"):
+#     """
+#     Test the image finder with a search query.
+
+#     Useful for testing and debugging image search functionality.
+#     """
+#     try:
+#         result = await image_finder.find_images(query, max_images, language)
+#         return result
+
+#     except Exception as e:
+#         logger.error(f"Image finder test failed: {e}")
+#         raise HTTPException(status_code=500, detail=f"Image finder test failed: {str(e)}")
 
 
 # Feed Processing Endpoints
 
 
 @app.post("/feed/warmup", response_model=FeedWarmupResponse)
-async def warmup_feed_entries(date: str = None, db: DatabaseClientAndPool = Depends(get_db_client)):
+async def warmup_feed_entries(request: FeedWarmupRequest, db: DatabaseClientAndPool = Depends(get_db_client)):
     """
     Warm up the server by loading feed entries for a specific date.
 
@@ -295,9 +307,7 @@ async def warmup_feed_entries(date: str = None, db: DatabaseClientAndPool = Depe
     """
     try:
         # Use today's date if not provided
-        if not date:
-            date = get_today_date()
-
+        date = request.date or get_today_date()
         # Validate date format
         try:
             validated_date = validate_and_raise(date, "date")
@@ -319,7 +329,9 @@ async def warmup_feed_entries(date: str = None, db: DatabaseClientAndPool = Depe
 
 
 @app.post("/feed/process", response_model=FeedProcessResponse)
-async def process_feed_entries(date: str = None, db: DatabaseClientAndPool = Depends(get_db_client)):
+async def process_feed_entries(request: FeedProcessRequest,
+                               background_tasks: BackgroundTasks,
+                               db: DatabaseClientAndPool = Depends(get_db_client)):
     """
     Process all feed entries for a specific date.
 
@@ -329,8 +341,7 @@ async def process_feed_entries(date: str = None, db: DatabaseClientAndPool = Dep
     """
     try:
         # Use today's date if not provided
-        if not date:
-            date = get_today_date()
+        date = request.date or get_today_date()
 
         # Validate date format
         try:
@@ -340,8 +351,23 @@ async def process_feed_entries(date: str = None, db: DatabaseClientAndPool = Dep
 
         # Process feed entries
         feed_processor.set_date(validated_date)
-        result = await feed_processor.process_all_feed_entries()
-
+        
+         # Fire-and-forget mode for MASX AI trigger
+        if getattr(request, "trigger", None) == "masxai":            
+            background_tasks.add_task(feed_processor.process_all_feed_entries, batch_mode=True)
+            logger.info(f"MASX AI background job started for {validated_date}")
+            return FeedProcessResponse(
+                status="started",
+                message=f"MASX AI background processing initiated for {validated_date}",
+                date=validated_date,
+                total_entries=0,
+                successful=0,
+                failed=0,
+                processing_time=0,
+                timestamp=datetime.utcnow().isoformat()
+            )        
+        
+        result = await feed_processor.process_all_feed_entries(batch_mode=True)
         return FeedProcessResponse(**result)
 
     except DatabaseError as e:
@@ -354,7 +380,9 @@ async def process_feed_entries(date: str = None, db: DatabaseClientAndPool = Dep
 
 @app.post("/feed/process/flashpoint", response_model=FeedProcessFlashpointResponse)
 async def process_feed_entries_by_flashpoint(
-    date: str = None, flashpoint_id: str = None, db: DatabaseClientAndPool = Depends(get_db_client)
+    request: FeedProcessFlashpointRequest,
+    background_tasks: BackgroundTasks, 
+    db: DatabaseClientAndPool = Depends(get_db_client)
 ):
     """
     Process feed entries for a specific date and flashpoint ID.
@@ -365,8 +393,8 @@ async def process_feed_entries_by_flashpoint(
     """
     try:
         # Use today's date if not provided
-        if not date:
-            date = get_today_date()
+        date = request.date or get_today_date()
+        flashpoint_id = request.flashpoint_id
 
         # Validate date format
         try:
@@ -380,6 +408,24 @@ async def process_feed_entries_by_flashpoint(
 
         # Process feed entries by flashpoint ID
         feed_processor.set_date(validated_date)
+        
+        # Fire-and-forget mode for MASX AI trigger
+        if getattr(request, "trigger", None) == "masxai":            
+            background_tasks.add_task(feed_processor.process_feed_entries_by_flashpoint_id, flashpoint_id)
+            logger.info(f"MASX AI background job started for {validated_date} and flashpoint_id {flashpoint_id}")
+            return FeedProcessFlashpointResponse(
+                status="started",
+                message=f"MASX AI background processing initiated for {validated_date} and flashpoint_id {flashpoint_id}",
+                date=validated_date,
+                flashpoint_id=flashpoint_id,
+                total_entries=0,
+                successful=0,
+                failed=0,
+                processing_time=0,
+                timestamp=datetime.utcnow().isoformat()
+            )
+        
+        
         result = await feed_processor.process_feed_entries_by_flashpoint_id(flashpoint_id)
 
         return FeedProcessFlashpointResponse(**result)
