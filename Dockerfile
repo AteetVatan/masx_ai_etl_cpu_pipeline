@@ -12,8 +12,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 COPY requirements-prod.txt .
 RUN python -m pip install --upgrade pip==24.2 && \
-    pip install --no-cache-dir --user -r requirements-prod.txt && \
-    python -m spacy download xx_ent_wiki_sm --direct --no-cache --user && \
+    pip install --no-cache-dir -r requirements-prod.txt && \
+    python -m spacy download xx_ent_wiki_sm --direct --no-cache && \
     python -m spacy validate
 
 # -----------------------------------------------------------------------------
@@ -27,11 +27,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libjpeg-turbo-progs libpng16-16 libtiff6 libwebp7 libpq5 \
     tesseract-ocr tesseract-ocr-eng curl \
     && rm -rf /var/lib/apt/lists/*
-COPY --from=builder /root/.local /root/.local
 
-# Add Python path for user-installed libs
-ENV PATH=/root/.local/bin:$PATH \
-    PYTHONPATH=/root/.local/lib/python3.12/site-packages:$PYTHONPATH
+#Copy global site-packages instead of user-local
+COPY --from=builder /usr/local /usr/local
+
+# No need for PYTHONPATH anymore
+ENV PATH=/usr/local/bin:$PATH
 
 COPY . .
 RUN rm -rf tests .git .env.example debug.py *.md LICENSE && \
