@@ -34,7 +34,9 @@ COPY --from=builder /usr/local /usr/local
 
 # Critical Fix: src.* imports need /app (not /app/src)
 #ENV PYTHONPATH="/app/src:/app:${PYTHONPATH}"
-ENV PYTHONPATH="/app:/app/src:${PYTHONPATH}"
+#ENV PYTHONPATH="/app:/app/src:${PYTHONPATH}"
+ENV PYTHONPATH="/app:/app/src"
+
 ENV PATH="/usr/local/bin:${PATH}"
 
 COPY . .
