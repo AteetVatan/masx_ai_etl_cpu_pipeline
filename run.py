@@ -93,7 +93,14 @@ def main():
         logger.info("Starting MASX AI ETL CPU Pipeline FastAPI server...")
         
         if not settings.debug:
-            os.chdir("/app")
+            #os.chdir("/app")
+            from pathlib import Path
+            ROOT = Path(__file__).resolve().parent
+            SRC = ROOT / "src"
+            for p in (str(ROOT), str(SRC)):
+                if p not in sys.path:
+                    sys.path.insert(0, p)
+            os.chdir(str(ROOT))
         
         uvicorn.run(**uvicorn_config)
     except KeyboardInterrupt:
