@@ -77,7 +77,7 @@ def main():
         logger = get_service_logger(__name__)
         print_startup_info()
         
-        app_path = "src.api.server:app" if settings.debug else "api.server:app"
+        app_path = "src.api.server:app" if settings.debug else "src.api.server:app"
 
         # Configure uvicorn
         uvicorn_config = {
