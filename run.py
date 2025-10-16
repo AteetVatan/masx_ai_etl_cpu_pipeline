@@ -71,11 +71,11 @@ def main():
     print_startup_info()
 
     # Run async dependency check
-    try:
-        asyncio.run(wait_for_startup_dependencies(max_retries=6, delay=6))
-    except Exception as e:
-        logger.error(f"Startup dependency check failed: {e}", exc_info=True)
-        sys.exit(1)
+    # try:
+    #     asyncio.run(wait_for_startup_dependencies(max_retries=6, delay=6))
+    # except Exception as e:
+    #     logger.error(f"Startup dependency check failed: {e}", exc_info=True)
+    #     sys.exit(1)
 
     app_path = "src.api.server:app"
     uvicorn_config = {
