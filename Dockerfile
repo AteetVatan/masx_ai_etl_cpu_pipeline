@@ -34,11 +34,13 @@ WORKDIR /app
 COPY --from=builder /usr/local /usr/local
 COPY . .
 
+# --- make src importable for ANY python process (incl. uvicorn workers) ---
+RUN ln -s /app/src /usr/local/lib/python3.12/site-packages/src
+# --------------------------------------------------------------------------
+
 ENV PYTHONPATH="/app:/app/src"
 
 USER appuser
 EXPOSE 8000
 
-WORKDIR /app
-ENV PYTHONPATH=/app
 CMD ["uvicorn", "src.api.server:app", "--host", "0.0.0.0", "--port", "8000"]
