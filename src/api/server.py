@@ -591,6 +591,12 @@ async def clear_all_feed_entries():
         raise HTTPException(
             status_code=500, detail=f"Failed to clear feed entries: {str(e)}"
         )
+        
+@app.get("/ready")
+async def readiness_check():
+    """Instant readiness endpoint for Railway health probe."""
+    return {"status": "ready", "uptime": "OK"}
+
 
 
 # Global exception handler

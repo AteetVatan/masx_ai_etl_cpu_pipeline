@@ -3,53 +3,49 @@
 Run script for MASX AI ETL CPU Pipeline.
 
 Provides a convenient entry point to start the FastAPI server with
-proper configuration and error handling.
+proper configuration, retries, and graceful failure handling.
 """
 
 import os
 import sys
 import asyncio
-from src.config import get_service_logger, get_settings
 from pathlib import Path
-
-# # Add src directory to Python path
-# src_path = Path(__file__).parent / "src"
-# sys.path.insert(0, str(src_path))
-
 import uvicorn
+
+from src.config import get_service_logger, get_settings
 
 settings = get_settings()
 
 
-def check_environment():
-    """Check if required environment variables are set."""
-    required_vars = [
-        "SUPABASE_URL",
-        "SUPABASE_KEY",
-        "SUPABASE_SERVICE_KEY",
-        "DB_NAME",
-        "DB_USER",
-        "DB_PASSWORD",
-    ]
+async def wait_for_startup_dependencies(max_retries: int = 5, delay: int = 5):
+    """
+    Wait for critical dependencies like Supabase/Postgres to become available.
 
-    missing_vars = []
-    for var in required_vars:
-        if not getattr(settings, var.lower(), None):
-            missing_vars.append(var)
+    Args:
+        max_retries (int): Number of retries before giving up.
+        delay (int): Seconds between retries.
+    """
+    from src.db import db_connection
 
-    if missing_vars:
-        print("Error: Missing required environment variables:")
-        for var in missing_vars:
-            print(f"   - {var}")
-        print("\nPlease check your .env file or environment variables.")
-        print("You can copy env.example to .env and configure it.")
-        return False
-
-    return True
+    for attempt in range(1, max_retries + 1):
+        try:
+            print(f"[INIT] Checking database connection (attempt {attempt}/{max_retries})...")
+            await db_connection.connect()
+            await db_connection.disconnect()
+            print("[INIT] Database connection OK")
+            return
+        except Exception as e:
+            print(f"[INIT] Database not ready yet: {e}")
+            if attempt < max_retries:
+                print(f"[INIT] Retrying in {delay}s...")
+                await asyncio.sleep(delay)
+            else:
+                print("[INIT] Database connection failed after max retries ❌")
+                sys.exit(1)
 
 
 def print_startup_info():
-    """Print startup information."""
+    """Print startup configuration for visibility."""
     print("MASX AI ETL CPU Pipeline")
     print("=" * 50)
     print(f"Version: 1.0.0")
@@ -70,36 +66,36 @@ def print_startup_info():
 
 
 def main():
-    """Main entry point for the application."""
+    """Main entry point for the MASX AI ETL CPU Pipeline."""
+    logger = get_service_logger(__name__)
+    print_startup_info()
+
+    # Run async dependency check
     try:
-        # Setup logging
+        asyncio.run(wait_for_startup_dependencies(max_retries=6, delay=6))
+    except Exception as e:
+        logger.error(f"Startup dependency check failed: {e}", exc_info=True)
+        sys.exit(1)
 
-        logger = get_service_logger(__name__)
-        print_startup_info()
+    app_path = "src.api.server:app"
+    uvicorn_config = {
+        "app": app_path,
+        "host": settings.host,
+        "port": settings.port,
+        "log_level": settings.log_level.lower(),
+        "access_log": True,
+        "reload": settings.debug,
+        "reload_dirs": ["src"] if settings.debug else None,
+        "workers": 1,
+    }
 
-        app_path = "src.api.server:app" if settings.debug else "src.api.server:app"
-
-        # Configure uvicorn
-        uvicorn_config = {
-            "app": app_path,
-            "host": settings.host,
-            "port": settings.port,
-            "log_level": settings.log_level.lower(),
-            "access_log": True,
-            "reload": settings.debug,
-            "reload_dirs": ["src"] if settings.debug else None,
-            "workers": 1,  # Single worker for development, use multiple for production
-        }
-
-        # Start the server
-        logger.info("Starting MASX AI ETL CPU Pipeline server...")
+    try:
+        logger.info("Starting MASX AI ETL CPU Pipeline FastAPI server...")
         uvicorn.run(**uvicorn_config)
-
     except KeyboardInterrupt:
-        print("\n Server stopped by user")
+        print("\n🧹 Server stopped by user")
         sys.exit(0)
     except Exception as e:
-        print(f" Error starting server: {e}")
         logger.error(f"Failed to start server: {e}", exc_info=True)
         sys.exit(1)
 
