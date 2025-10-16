@@ -37,7 +37,9 @@ ENV PATH=/usr/local/bin:$PATH
 
 COPY . .
 RUN rm -rf tests .git .env.example debug.py *.md LICENSE && \
-    find . -name "__pycache__" -type d -exec rm -rf {} +
+    find . -name "__pycache__" -type d -exec rm -rf {} + && \
+    sed -i 's|sys.path.insert(0, str(src_path))|# sys.path.insert(0, str(src_path))  # Disabled - using PYTHONPATH instead|' run.py
+
 
 USER appuser
 EXPOSE 8000

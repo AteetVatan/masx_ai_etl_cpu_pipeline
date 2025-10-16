@@ -28,7 +28,6 @@ from src.models import (
     FeedModel,
     ExtractResult,
     EntityModel,
-    EntityAttributes,
     GeoEntity,
 )
 from src.utils import NlpUtils, LanguageUtils
