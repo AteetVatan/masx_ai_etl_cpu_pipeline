@@ -41,7 +41,7 @@ COPY --from=builder /usr/local /usr/local
 # Path + Environment Setup
 # -----------------------------------------------------------------------------
 # Both /app and /app/src visible for imports (src.*)
-ENV PYTHONPATH="/app:/app/src"
+ENV PYTHONPATH="/app"
 ENV PATH="/usr/local/bin:${PATH}"
 
 # Copy application source
@@ -63,4 +63,4 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
 # -----------------------------------------------------------------------------
 # Final CMD: Run FastAPI directly via Uvicorn (no run.py)
 # -----------------------------------------------------------------------------
-CMD ["uvicorn", "src.api.server:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "info"]
+CMD ["uvicorn", "api.server:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "info"]
