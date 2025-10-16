@@ -22,20 +22,23 @@ RUN python -m pip install --upgrade pip==24.2 && \
 FROM python:3.12-slim
 RUN groupadd -r appuser && useradd -r -g appuser appuser
 WORKDIR /app
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libicu-dev libxml2 libxslt1.1 libffi8 libssl3 \
     libjpeg-turbo-progs libpng16-16 libtiff6 libwebp7 libpq5 \
     tesseract-ocr tesseract-ocr-eng curl \
     && rm -rf /var/lib/apt/lists/*
 
-#Copy global site-packages instead of user-local
+# Copy global site-packages
 COPY --from=builder /usr/local /usr/local
 
-# Set PYTHONPATH to include the app directory for proper module resolution
-ENV PYTHONPATH=/app:$PYTHONPATH
-ENV PATH=/usr/local/bin:$PATH
+# Critical Fix: src.* imports need /app (not /app/src)
+ENV PYTHONPATH="/app:${PYTHONPATH}"
+ENV PATH="/usr/local/bin:${PATH}"
 
 COPY . .
+
+# Clean up unnecessary files
 RUN rm -rf tests .git .env.example debug.py *.md LICENSE && \
     find . -name "__pycache__" -type d -exec rm -rf {} +
 

@@ -12,9 +12,9 @@ import asyncio
 from src.config import get_service_logger, get_settings
 from pathlib import Path
 
-# Add src directory to Python path
-src_path = Path(__file__).parent / "src"
-sys.path.insert(0, str(src_path))
+# # Add src directory to Python path
+# src_path = Path(__file__).parent / "src"
+# sys.path.insert(0, str(src_path))
 
 import uvicorn
 
