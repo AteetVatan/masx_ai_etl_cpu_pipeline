@@ -8,7 +8,8 @@ with proper error handling and connection management.
 import asyncio
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
-from src.models import FeedModel
+#from src.models import FeedModel
+from ..models import FeedModel
 import asyncpg
 import re
 from supabase import create_client, Client
