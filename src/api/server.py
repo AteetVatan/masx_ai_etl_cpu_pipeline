@@ -17,10 +17,10 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 
-from src.config import get_settings, get_api_logger
-from src.utils import validate_and_raise, get_today_date
+from ..config import get_settings, get_api_logger
+from ..utils import validate_and_raise, get_today_date
 
-from src.db import DatabaseClientAndPool, DatabaseError
+from ..db import DatabaseClientAndPool, DatabaseError
 
 
 logger = get_api_logger(__name__)
@@ -105,9 +105,9 @@ class FeedProcessFlashpointResponse(BaseModel):
 async def lifespan(app: FastAPI):
     """Manage application startup and shutdown."""
     logger.info("Starting MASX AI ETL CPU Pipeline server")
-    from src.db import db_connection, DatabaseClientAndPool, DatabaseError
-    from src.pipeline import pipeline_manager
-    from src.processing import feed_processor
+    from ..db import db_connection, DatabaseClientAndPool, DatabaseError
+    from ..pipeline import pipeline_manager
+    from ..processing import feed_processor
 
     try:
         # Initialize database connection
@@ -197,7 +197,7 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Dependency for database connection
 async def get_db_client():
-    from src.db import db_connection
+    from ..db import db_connection
 
     """Dependency to ensure database connection."""
     if not db_connection.client:
@@ -206,19 +206,19 @@ async def get_db_client():
 
 
 #  # ✅ Lazy import after app + loop exist
-#     from src.db import db_connection, DatabaseClientAndPool, DatabaseError
-#     from src.pipeline import pipeline_manager
-#     from src.processing import feed_processor
+#     from ..db import db_connection, DatabaseClientAndPool, DatabaseError
+#     from ..pipeline import pipeline_manager
+#     from ..processing import feed_processor
 
 
 async def get_pipeline_manager():
-    from src.pipeline import pipeline_manager
+    from ..pipeline import pipeline_manager
 
     return pipeline_manager
 
 
 async def get_feed_processor():
-    from src.processing import feed_processor
+    from ..processing import feed_processor
 
     return feed_processor
 

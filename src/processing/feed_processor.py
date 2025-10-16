@@ -10,18 +10,18 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 
 
-from src.db import db_connection, DatabaseError
-from src.models import FeedModel
-from src.config import get_service_logger
-from src.utils import validate_and_raise
-from src.services import ProxyService
+from ..db import db_connection, DatabaseError
+from ..models import FeedModel
+from ..config import get_service_logger
+from ..utils import validate_and_raise
+from ..services import ProxyService
 
 logger = get_service_logger(__name__)
 
 
 def _get_pipeline_manager():
     """Lazy import to avoid circular dependency."""
-    from src.pipeline.pipeline_manager import pipeline_manager
+    from ..pipeline.pipeline_manager import pipeline_manager
 
     return pipeline_manager
 
