@@ -46,5 +46,5 @@ RUN rm -rf tests .git .env.example debug.py *.md LICENSE && \
 
 USER appuser
 EXPOSE 8000
-
+CMD ["python", "run.py"]
 # --------------------------------------------
