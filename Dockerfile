@@ -63,4 +63,4 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
 # -----------------------------------------------------------------------------
 # Final CMD: Run FastAPI directly via Uvicorn (no run.py)
 # -----------------------------------------------------------------------------
-CMD ["uvicorn", "api.server:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "info"]
+CMD ["uvicorn", "src.api.server:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "info"]
