@@ -42,7 +42,8 @@ WORKDIR /app
 COPY --from=builder /usr/local /usr/local
 
 # Ensure imports like `from src.models import ...` work
-ENV PYTHONPATH="/app"
+#ENV PYTHONPATH="/app"
+ENV PYTHONPATH="/app:/app/src"
 
 # Copy the entire app
 COPY . .
