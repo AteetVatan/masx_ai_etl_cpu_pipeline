@@ -377,16 +377,14 @@ class BeautifulSoupExtractor:
 
         return metadata
 
-
-class ScrapingError(Exception):
-    """Custom exception for scraping-related errors."""
-
-    pass
-
-
 # Global scraper instance
 beautiful_soap_extractor = BeautifulSoupExtractor()
 
 
 def get_beautiful_soap_extractor():
     return beautiful_soap_extractor
+
+
+class ScrapingError(Exception):
+    """Custom exception for scraping-related errors."""
+    pass

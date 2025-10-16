@@ -15,14 +15,14 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from src.config import get_settings, get_api_logger
-from ..pipeline.pipeline_manager import pipeline_manager
+from src.pipeline import pipeline_manager
+
+
 from src.db import db_connection, DatabaseClientAndPool
 from src.db import DatabaseError
-from ..processing.cleaner import text_cleaner
-from ..processing.geotagger import geotagger
-from ..processing.image_finder import image_finder
-from ..processing.feed_processor import feed_processor
-from ..utils.date_validation import validate_and_raise, get_today_date
+
+from src.processing import feed_processor
+from src.utils import validate_and_raise, get_today_date
 
 
 logger = get_api_logger(__name__)

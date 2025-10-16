@@ -258,10 +258,3 @@ class TrafilaturaExtractor:
             "hostname": res.hostname,
         }
 
-
-# Global instance + getter (mirrors your previous pattern)
-trafilatura_extractor = TrafilaturaExtractor()
-
-
-def get_trafilatura_extractor() -> TrafilaturaExtractor:
-    return trafilatura_extractor

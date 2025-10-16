@@ -64,7 +64,14 @@ class PipelineManager:
         self.proxy_service = ProxyService.get_instance()
         self.nlp_utils = NlpUtils()
 
-        asyncio.run(self.proxy_service.ping_start_proxy())
+        # try:
+        #     loop = asyncio.get_event_loop()
+        #     if loop.is_running():
+        #         loop.create_task(self.proxy_service.ping_start_proxy())
+        #     else:
+        #         loop.run_until_complete(self.proxy_service.ping_start_proxy())
+        # except RuntimeError:
+        #     asyncio.run(self.proxy_service.ping_start_proxy())
 
         # Note: Statistics removed to avoid race conditions in parallel execution
 
@@ -776,4 +783,18 @@ class PipelineManager:
 
 
 # Global pipeline manager instance
-pipeline_manager = PipelineManager()
+try:
+    pipeline_manager = PipelineManager()
+    print("PipelineManager created successfully")
+    
+    # Check if process_batch method exists
+    if hasattr(pipeline_manager, 'process_batch'):
+        print("process_batch method exists")
+    else:
+        print("process_batch method does NOT exist")
+        print(f"Available methods: {[method for method in dir(pipeline_manager) if not method.startswith('_')]}")
+        
+except Exception as e:
+    print(f"Error creating PipelineManager: {e}")
+    import traceback
+    traceback.print_exc()

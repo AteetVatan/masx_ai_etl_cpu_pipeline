@@ -272,7 +272,3 @@ class Geotagger:
         except Exception:
             pass
         return {"name": iso2.upper(), "alpha2": iso2.upper(), "alpha3": None}
-
-
-# Global singleton
-geotagger = Geotagger()

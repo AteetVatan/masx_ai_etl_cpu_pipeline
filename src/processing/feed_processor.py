@@ -11,13 +11,18 @@ from datetime import datetime, timedelta
 
 
 from src.db import db_connection, DatabaseError
-from ..pipeline.pipeline_manager import pipeline_manager
 from src.models import FeedModel
 from src.config import get_service_logger
 from src.utils import validate_and_raise
 from src.services import ProxyService
 
 logger = get_service_logger(__name__)
+
+
+def _get_pipeline_manager():
+    """Lazy import to avoid circular dependency."""
+    from src.pipeline.pipeline_manager import pipeline_manager
+    return pipeline_manager
 
 
 class FeedProcessor:
@@ -138,6 +143,7 @@ class FeedProcessor:
             results = {"successful": 0, "failed": 0, "processing_time": 0}
 
             proxy_service = ProxyService.get_instance()
+            proxy_service.ping_start_proxy()            
             await proxy_service.start_proxy_refresher()
             proxies = await proxy_service.get_proxy_cache()
 
@@ -218,8 +224,15 @@ class FeedProcessor:
                     "timestamp": datetime.utcnow().isoformat(),
                 }
 
+            proxy_service = ProxyService.get_instance()
+            proxy_service.ping_start_proxy()            
+            await proxy_service.start_proxy_refresher()
+            proxies = await proxy_service.get_proxy_cache()
+
             # Process filtered entries
             results = await self._process_feed_entries(feed_entries)
+
+            await proxy_service.stop_proxy_refresher()
 
             # Update statistics
             self.processing_stats["total_processed"] += len(feed_entries)
@@ -286,6 +299,7 @@ class FeedProcessor:
                 article_data: FeedModel = FeedModel.from_feed_entry(feed_entry)
 
                 # Process through pipeline
+                pipeline_manager = _get_pipeline_manager()
                 result = await pipeline_manager.process_article(article_data, self.date)
 
                 if result["status"] == "completed":
@@ -357,9 +371,10 @@ class FeedProcessor:
                     "processing_time": (datetime.utcnow() - start_time).total_seconds(),
                 }
 
-            # article_data_list = article_data_list[:5]
+            article_data_list = article_data_list[:3]
 
             # Process articles in batch
+            pipeline_manager = _get_pipeline_manager()
             data_results = await pipeline_manager.process_batch(
                 article_data_list, self.date
             )
@@ -470,3 +485,6 @@ class FeedProcessor:
 
 # Global feed processor instance
 feed_processor = FeedProcessor()
+
+def get_feed_processor() -> FeedProcessor:
+    return feed_processor

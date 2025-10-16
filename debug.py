@@ -24,10 +24,10 @@ from typing import Optional
 
 
 from src.config import settings
-from src.db.db_client_and_pool import db_connection
-from src.processing.feed_processor import feed_processor
-from src.pipeline.pipeline_manager import pipeline_manager
-from src.utils.date_validation import validate_date_format, get_today_date
+from src.db import db_connection
+from src.processing import feed_processor
+from src.pipeline import pipeline_manager
+from src.utils import validate_date_format, get_today_date
 from src.config import get_service_logger
 
 # Configure logging

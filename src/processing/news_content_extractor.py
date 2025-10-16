@@ -28,8 +28,8 @@ from src.config import settings
 from src.config import get_service_logger
 from src.scraping import (
     Crawl4AIExtractor,
-    get_beautiful_soap_extractor,
-    get_trafilatura_extractor,
+    BeautifulSoupExtractor,
+    TrafilaturaExtractor,
     get_final_url,
 )
 from src.scraping import WebScraperUtils
@@ -97,7 +97,7 @@ class NewsContentExtractor:
             # Step 1: Try trafilatura extraction
 
             try:
-                trafilatura_extractor = get_trafilatura_extractor()
+                trafilatura_extractor = TrafilaturaExtractor()
                 proxy = choice(proxies)
                 traf_result: ExtractResult = await trafilatura_extractor.scrape_article(
                     url, proxy

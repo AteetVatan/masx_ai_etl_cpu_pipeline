@@ -285,9 +285,9 @@ class Crawl4AIExtractor:
 
     async def trafilatura_from_html(self, html: str, url: str) -> ExtractResult:
         try:
-            from src.scraping import get_trafilatura_extractor
+            from src.scraping import TrafilaturaExtractor
 
-            trafilatura_extractor = get_trafilatura_extractor()
+            trafilatura_extractor = TrafilaturaExtractor()
             result: ExtractResult = await trafilatura_extractor.trafilatura_from_html(
                 html, url
             )
@@ -298,9 +298,9 @@ class Crawl4AIExtractor:
 
     async def beautifulSoup_from_html(self, html: str, url: str) -> ExtractResult:
         try:
-            from src.scraping import get_beautiful_soap_extractor
+            from src.scraping import BeautifulSoupExtractor
 
-            beautiful_soap_extractor = get_beautiful_soap_extractor()
+            beautiful_soap_extractor = BeautifulSoupExtractor()
             result: ExtractResult = (
                 await beautiful_soap_extractor.beautifulSoup_from_html(html, url)
             )

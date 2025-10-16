@@ -12,10 +12,10 @@ from typing import Dict, Any, List
 from src.config.settings import Settings
 from src.db.db_client_and_pool import DatabaseClientAndPool
 from src.scraping.scraper import BeautifulSoupExtractor
-from src.processing.cleaner import TextCleaner
-from src.processing.geotagger import Geotagger
-from src.processing.image_finder import ImageFinder
-from src.pipeline.pipeline_manager import PipelineManager
+from src.processing import TextCleaner
+from src.processing import Geotagger
+from src.processing import ImageFinder
+from src.pipeline import PipelineManager
 from src.utils.threadpool import DynamicThreadPool
 
 

@@ -369,7 +369,3 @@ class ImageFinder:
                 codes.add(code)
 
         return sorted(codes)
-
-
-# Global instance
-image_finder = ImageFinder()

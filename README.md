@@ -502,24 +502,11 @@ python -m uvicorn src.api.server:app --reload --log-level debug
 - **ProxyService**: Added thread-safe cache management
 - **PipelineManager**: Removed shared statistics to prevent race conditions
 
-### Code Cleanup
-- Removed unused code, classes, and methods
-- Eliminated commented-out test code
-- Improved error handling and logging
-- Enhanced configuration management
 
 ### Performance Enhancements
 - Optimized batch size calculation for even worker distribution
 - Improved Supabase storage operations
 - Enhanced parallel processing capabilities
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
 
 ### Development Guidelines
 - Follow PEP 8 style guidelines
