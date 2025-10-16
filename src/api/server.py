@@ -5,6 +5,7 @@ Provides production-ready REST API endpoints for feed processing
 and system monitoring with comprehensive error handling.
 """
 
+
 from typing import Dict, Any
 from datetime import datetime
 from contextlib import asynccontextmanager
@@ -14,15 +15,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+
+
 from src.config import get_settings, get_api_logger
-from src.pipeline import pipeline_manager
-
-
-from src.db import db_connection, DatabaseClientAndPool
-from src.db import DatabaseError
-
-from src.processing import feed_processor
 from src.utils import validate_and_raise, get_today_date
+
+from src.db import DatabaseClientAndPool, DatabaseError
 
 
 logger = get_api_logger(__name__)
@@ -106,8 +104,10 @@ class FeedProcessFlashpointResponse(BaseModel):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application startup and shutdown."""
-    # Startup
     logger.info("Starting MASX AI ETL CPU Pipeline server")
+    from src.db import db_connection, DatabaseClientAndPool, DatabaseError
+    from src.pipeline import pipeline_manager
+    from src.processing import feed_processor
 
     try:
         # Initialize database connection
@@ -197,10 +197,30 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Dependency for database connection
 async def get_db_client():
+    from src.db import db_connection
+
     """Dependency to ensure database connection."""
     if not db_connection.client:
         await db_connection.connect()
     return db_connection
+
+
+#  # ✅ Lazy import after app + loop exist
+#     from src.db import db_connection, DatabaseClientAndPool, DatabaseError
+#     from src.pipeline import pipeline_manager
+#     from src.processing import feed_processor
+
+
+async def get_pipeline_manager():
+    from src.pipeline import pipeline_manager
+
+    return pipeline_manager
+
+
+async def get_feed_processor():
+    from src.processing import feed_processor
+
+    return feed_processor
 
 
 # API Endpoints
@@ -227,6 +247,7 @@ async def health_check():
     database, thread pool, and processing modules.
     """
     try:
+        pipeline_manager = await get_pipeline_manager()
         health_data = await pipeline_manager.health_check()
         return HealthResponse(**health_data)
     except Exception as e:
@@ -243,6 +264,7 @@ async def get_stats():
     thread pool usage, and database operations.
     """
     try:
+        pipeline_manager = await get_pipeline_manager()
         stats_data = await pipeline_manager.get_pipeline_stats()
         return StatsResponse(**stats_data)
     except Exception as e:
@@ -312,6 +334,7 @@ async def warmup_feed_entries(
     into memory for processing. If no date is provided, uses today's date.
     """
     try:
+        feed_processor = await get_feed_processor()
         # Use today's date if not provided
         date = request.date or get_today_date()
         # Validate date format
@@ -350,6 +373,7 @@ async def process_feed_entries(
     If no date is provided, uses today's date.
     """
     try:
+        feed_processor = await get_feed_processor()
         # Use today's date if not provided
         date = request.date or get_today_date()
 
@@ -406,6 +430,7 @@ async def process_feed_entries_by_flashpoint(
     If no date is provided, uses today's date.
     """
     try:
+        feed_processor = await get_feed_processor()
         # Use today's date if not provided
         date = request.date or get_today_date()
         flashpoint_id = request.flashpoint_id
@@ -469,6 +494,7 @@ async def get_feed_entries(
     Returns the feed entries that are currently loaded in memory for the specified date.
     """
     try:
+        feed_processor = await get_feed_processor()
         # Validate date format
         try:
             validated_date = validate_and_raise(date, "date")
@@ -501,6 +527,7 @@ async def get_feed_stats():
     loaded entries, processing counts, and performance metrics.
     """
     try:
+        feed_processor = await get_feed_processor()
         stats = feed_processor.get_processing_stats()
         return stats
 
@@ -519,6 +546,7 @@ async def clear_feed_entries(date: str):
     This endpoint removes the loaded feed entries from memory to free up resources.
     """
     try:
+        feed_processor = await get_feed_processor()
         # Validate date format
         try:
             validated_date = validate_and_raise(date, "date")
@@ -549,6 +577,7 @@ async def clear_all_feed_entries():
     This endpoint removes all loaded feed entries from memory to free up resources.
     """
     try:
+        feed_processor = await get_feed_processor()
         # Clear all feed entries
         feed_processor.clear_feed_entries()
 
