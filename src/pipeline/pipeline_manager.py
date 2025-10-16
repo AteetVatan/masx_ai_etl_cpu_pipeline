@@ -13,8 +13,8 @@ import random
 from datetime import datetime
 
 
-from ..db import db_connection, DatabaseError
-from ..processing import (
+from src.db import db_connection, DatabaseError
+from src.processing import (
     NewsContentExtractor,
     EntityTagger,
     TextCleaner,
@@ -22,15 +22,15 @@ from ..processing import (
     ImageFinder,
     ImageDownloader,
 )
-from ..services import ProxyService, TranslationManager
-from ..config import get_service_logger, get_settings
-from ..models import (
+from src.services import ProxyService, TranslationManager
+from src.config import get_service_logger, get_settings
+from src.models import (
     FeedModel,
     ExtractResult,
     EntityModel,
     GeoEntity,
 )
-from ..utils import NlpUtils, LanguageUtils
+from src.utils import NlpUtils, LanguageUtils
 
 
 logger = get_service_logger(__name__)
