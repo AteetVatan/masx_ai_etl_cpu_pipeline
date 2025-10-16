@@ -39,4 +39,6 @@ ENV PYTHONPATH="/app:/app/src"
 USER appuser
 EXPOSE 8000
 
+WORKDIR /app
+ENV PYTHONPATH=/app
 CMD ["python", "run.py"]

@@ -91,6 +91,10 @@ def main():
 
     try:
         logger.info("Starting MASX AI ETL CPU Pipeline FastAPI server...")
+        
+        if not settings.debug:
+            os.chdir("/app")
+        
         uvicorn.run(**uvicorn_config)
     except KeyboardInterrupt:
         print("\n🧹 Server stopped by user")
