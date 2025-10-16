@@ -257,4 +257,3 @@ class TrafilaturaExtractor:
             "word_count": res.word_count,
             "hostname": res.hostname,
         }
-

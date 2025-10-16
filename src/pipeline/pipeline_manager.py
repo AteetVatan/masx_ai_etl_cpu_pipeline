@@ -786,15 +786,18 @@ class PipelineManager:
 try:
     pipeline_manager = PipelineManager()
     print("PipelineManager created successfully")
-    
+
     # Check if process_batch method exists
-    if hasattr(pipeline_manager, 'process_batch'):
+    if hasattr(pipeline_manager, "process_batch"):
         print("process_batch method exists")
     else:
         print("process_batch method does NOT exist")
-        print(f"Available methods: {[method for method in dir(pipeline_manager) if not method.startswith('_')]}")
-        
+        print(
+            f"Available methods: {[method for method in dir(pipeline_manager) if not method.startswith('_')]}"
+        )
+
 except Exception as e:
     print(f"Error creating PipelineManager: {e}")
     import traceback
+
     traceback.print_exc()

@@ -1,6 +1,6 @@
 """Text processing and enrichment module for MASX AI ETL CPU Pipeline."""
 from .cleaner import text_cleaner, TextCleaner
-from .feed_processor import feed_processor,get_feed_processor
+from .feed_processor import feed_processor, get_feed_processor
 from .entity_tragger import EntityTagger
 from .geotagger import Geotagger
 from .image_finder import ImageFinder
@@ -15,6 +15,6 @@ __all__ = [
     "EntityTagger",
     "Geotagger",
     "ImageFinder",
-    "NewsContentExtractor",    
+    "NewsContentExtractor",
     "ImageDownloader",
 ]

@@ -22,6 +22,7 @@ logger = get_service_logger(__name__)
 def _get_pipeline_manager():
     """Lazy import to avoid circular dependency."""
     from src.pipeline.pipeline_manager import pipeline_manager
+
     return pipeline_manager
 
 
@@ -143,7 +144,7 @@ class FeedProcessor:
             results = {"successful": 0, "failed": 0, "processing_time": 0}
 
             proxy_service = ProxyService.get_instance()
-            proxy_service.ping_start_proxy()            
+            proxy_service.ping_start_proxy()
             await proxy_service.start_proxy_refresher()
             proxies = await proxy_service.get_proxy_cache()
 
@@ -225,7 +226,7 @@ class FeedProcessor:
                 }
 
             proxy_service = ProxyService.get_instance()
-            proxy_service.ping_start_proxy()            
+            proxy_service.ping_start_proxy()
             await proxy_service.start_proxy_refresher()
             proxies = await proxy_service.get_proxy_cache()
 
@@ -371,7 +372,7 @@ class FeedProcessor:
                     "processing_time": (datetime.utcnow() - start_time).total_seconds(),
                 }
 
-            #article_data_list = article_data_list[:3]
+            # article_data_list = article_data_list[:3]
 
             # Process articles in batch
             pipeline_manager = _get_pipeline_manager()
@@ -485,6 +486,7 @@ class FeedProcessor:
 
 # Global feed processor instance
 feed_processor = FeedProcessor()
+
 
 def get_feed_processor() -> FeedProcessor:
     return feed_processor

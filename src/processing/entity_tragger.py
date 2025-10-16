@@ -352,4 +352,3 @@ class EntityTagger:
                 mx[w] = max(mx[w], s)
             found[label] = [(k, round(v, 4)) for k, v in mx.items()]
         return found
-
