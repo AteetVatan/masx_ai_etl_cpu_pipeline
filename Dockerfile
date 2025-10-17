@@ -27,10 +27,13 @@ WORKDIR /app
 # Install dependencies
 # ----------------------------------------------------------------
 COPY requirements-prod.txt .
+
 RUN python -m pip install --upgrade pip==24.2 && \
     pip install --no-cache-dir -r requirements-prod.txt && \
     python -m spacy download xx_ent_wiki_sm --direct --no-cache && \
-    python -m spacy validate
+    python -m spacy validate && \
+    playwright install --with-deps chromium && \
+    rm -rf /root/.cache/pip /root/.cache/ms-playwright
 
 # ----------------------------------------------------------------
 # Copy source code and install as editable package
