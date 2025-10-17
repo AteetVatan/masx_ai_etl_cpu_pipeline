@@ -4,13 +4,7 @@ from collections import defaultdict, Counter
 import re
 from transformers import pipeline
 from src.config import get_settings, get_service_logger
-#from src.models import EntityModel, EntityAttributes, MetaAttributes
-#from src.models.entity_model import EntityModel
-from ..models.entity_model import EntityModel
-#from src.models.entity_model import EntityAttributes
-from ..models.entity_model import EntityAttributes
-#from src.models.entity_model import MetaAttributes
-from ..models.entity_model import MetaAttributes
+from src.models import EntityModel, EntityAttributes, MetaAttributes
 
 # Optional: LOC→GPE promotion
 try:

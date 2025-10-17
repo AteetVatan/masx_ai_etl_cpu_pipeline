@@ -32,8 +32,7 @@ import httpx
 from supabase import create_client, Client
 
 from src.config import get_settings, get_service_logger
-#from src.models.extract_result import ExtractResult  # expects .id: str, .images: List[str]
-from ..models.extract_result import ExtractResult
+from src.models import ExtractResult  # expects .id: str, .images: List[str]
 
 logger = get_service_logger(__name__)
 settings = get_settings()

@@ -23,8 +23,8 @@ from random import choice
 import asyncio
 
 from src.services import ProxyService
-#from src.models.extract_result import ExtractResult
-from ..models.extract_result import ExtractResult
+from src.models import ExtractResult
+
 from src.config import settings
 from src.config import get_service_logger
 from src.scraping import (

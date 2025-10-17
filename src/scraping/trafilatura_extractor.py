@@ -26,8 +26,7 @@ from trafilatura import fetch_response
 from trafilatura.settings import use_config
 
 from src.config import get_settings, get_service_logger
-#from src.models.extract_result import ExtractResult
-from ..models.extract_result import ExtractResult
+from src.models import ExtractResult
 from src.scraping import WebScraperUtils
 
 logger = get_service_logger(__name__)
