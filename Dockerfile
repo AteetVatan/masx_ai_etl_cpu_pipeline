@@ -24,15 +24,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # ----------------------------------------------------------------
-# Install dependencies
+# Install dependencies (CPU-only Playwright)
 # ----------------------------------------------------------------
 COPY requirements-prod.txt .
+
+# Persistent browser path for all users
+ENV PLAYWRIGHT_BROWSERS_PATH=/usr/lib/playwright \
+    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=0
 
 RUN python -m pip install --upgrade pip==24.2 && \
     pip install --no-cache-dir -r requirements-prod.txt && \
     python -m spacy download xx_ent_wiki_sm --direct --no-cache && \
     python -m spacy validate && \
-    playwright install --with-deps chromium && \
+    python -m playwright install --with-deps chromium && \
+    chmod -R 777 /usr/lib/playwright && \
     rm -rf /root/.cache/pip /root/.cache/ms-playwright
 
 # ----------------------------------------------------------------
