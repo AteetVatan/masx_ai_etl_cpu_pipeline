@@ -56,6 +56,8 @@ def main():
     }
 
     try:
+
+        sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
         logger.info("Starting MASX AI ETL CPU Pipeline FastAPI server...")        
         uvicorn.run(**uvicorn_config)
     except KeyboardInterrupt:
