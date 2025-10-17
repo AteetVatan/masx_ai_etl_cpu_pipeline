@@ -27,7 +27,7 @@ from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode, BrowserConfig
 from crawl4ai.content_filter_strategy import PruningContentFilter
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
-from src.models import ExtractResult
+from src.models.extract_result import ExtractResult
 
 from src.config import get_service_logger
 

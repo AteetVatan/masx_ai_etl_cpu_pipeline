@@ -15,7 +15,9 @@ from collections import OrderedDict, defaultdict
 
 import countrytagger  # <-- module with tag_text_countries / tag_place
 import pycountry
-from src.models import GeoEntity, EntityAttributes
+from src.models.geo_entity import GeoEntity
+from src.models.entity_model import EntityAttributes
+
 from src.config import get_settings, get_service_logger
 
 

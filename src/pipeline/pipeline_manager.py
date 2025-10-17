@@ -24,12 +24,17 @@ from src.processing import (
 )
 from src.services import ProxyService, TranslationManager
 from src.config import get_service_logger, get_settings
-from src.models import (
-    FeedModel,
-    ExtractResult,
-    EntityModel,
-    GeoEntity,
-)
+# from src.models import (
+#     FeedModel,
+#     ExtractResult,
+#     EntityModel,
+#     GeoEntity,
+# )
+from src.models.feed_models import FeedModel
+from src.models.extract_result import ExtractResult
+from src.models.entity_model import EntityModel
+from src.models.geo_entity import GeoEntity
+
 from src.utils import NlpUtils, LanguageUtils
 
 
