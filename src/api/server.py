@@ -388,7 +388,7 @@ async def process_feed_entries(
         # Fire-and-forget mode for MASX AI trigger
         if getattr(request, "trigger", None) == "masxai":
             background_tasks.add_task(
-                feed_processor.process_all_feed_entries, batch_mode=False
+                feed_processor.process_all_feed_entries, batch_mode=True
             )
             logger.info(f"MASX AI background job started for {validated_date}")
             return FeedProcessResponse(
@@ -402,7 +402,7 @@ async def process_feed_entries(
                 timestamp=datetime.utcnow().isoformat(),
             )
 
-        result = await feed_processor.process_all_feed_entries(batch_mode=False)
+        result = await feed_processor.process_all_feed_entries(batch_mode=True)
         return FeedProcessResponse(**result)
 
     except DatabaseError as e:

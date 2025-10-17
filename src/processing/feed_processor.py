@@ -372,7 +372,7 @@ class FeedProcessor:
                     "processing_time": (datetime.utcnow() - start_time).total_seconds(),
                 }
 
-            #article_data_list = article_data_list[:1]
+            article_data_list = article_data_list[:1]
 
             # Process articles in batch
             pipeline_manager = _get_pipeline_manager()

@@ -29,7 +29,7 @@ from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
 from src.models import ExtractResult
 from src.config import get_service_logger
-
+import requests
 
 class Crawl4AIExtractor:
     """
@@ -182,7 +182,7 @@ class Crawl4AIExtractor:
         return config
 
     async def crawl4ai_scrape(
-        self, url: str, timeout_sec: int = 10  # maximum  10 seconds
+        self, url: str, timeout_sec: int = 3600,  # maximum 1 minute
     ) -> ExtractResult:
         try:
             from src.scraping import WebScraperUtils
