@@ -145,9 +145,9 @@ class FeedProcessor:
 
             proxy_service = ProxyService.get_instance()
             await proxy_service.ping_start_proxy()
-            await proxy_service.start_proxy_refresher()
+            #await proxy_service.start_proxy_refresher()
             proxies = await proxy_service.get_proxy_cache()
-
+           
             if batch_mode:
                 results = await self._process_feed_entries_batch(feed_entries)
             else:
@@ -227,7 +227,7 @@ class FeedProcessor:
 
             proxy_service = ProxyService.get_instance()
             await proxy_service.ping_start_proxy()
-            await proxy_service.start_proxy_refresher()
+            #await proxy_service.start_proxy_refresher()
             proxies = await proxy_service.get_proxy_cache()
 
             # Process filtered entries
@@ -372,7 +372,7 @@ class FeedProcessor:
                     "processing_time": (datetime.utcnow() - start_time).total_seconds(),
                 }
 
-            # article_data_list = article_data_list[:3]
+            #article_data_list = article_data_list[:1]
 
             # Process articles in batch
             pipeline_manager = _get_pipeline_manager()
