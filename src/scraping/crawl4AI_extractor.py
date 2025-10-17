@@ -191,6 +191,8 @@ class Crawl4AIExtractor:
                 "--disable-setuid-sandbox",
                 "--disable-software-rasterizer",
             ],
+            ignore_https_errors=True,
+            enable_stealth=True,  # helps bypass bot detection
         )
         return browser_cfg
     

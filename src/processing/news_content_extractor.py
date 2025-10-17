@@ -124,9 +124,7 @@ class NewsContentExtractor:
             self.logger.info(
                 f"NewsContentExtractor:[Fallback] Invoking Crawl4AI for: {url}"
             )
-            try:
-                url = "https://www.ihu.unisinos.br/656066-negacionismo-parlamentar-poe-no-lixo-44-anos-da-politica-ambiental-brasileira-e-pl-da-devastacao-abre-brecha-a-criacao-de-vales-da-morte-de-norte-a-sul-entrevista-especial-com-suely-araujo"
-
+            try:               
                 proxy = choice(proxies)
                 crawl_result: ExtractResult = (
                     await self.crawl4AIExtractor.crawl4ai_scrape_with_retry(url)
