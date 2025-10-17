@@ -144,7 +144,7 @@ class FeedProcessor:
             results = {"successful": 0, "failed": 0, "processing_time": 0}
 
             proxy_service = ProxyService.get_instance()
-            proxy_service.ping_start_proxy()
+            await proxy_service.ping_start_proxy()
             await proxy_service.start_proxy_refresher()
             proxies = await proxy_service.get_proxy_cache()
 
@@ -226,7 +226,7 @@ class FeedProcessor:
                 }
 
             proxy_service = ProxyService.get_instance()
-            proxy_service.ping_start_proxy()
+            await proxy_service.ping_start_proxy()
             await proxy_service.start_proxy_refresher()
             proxies = await proxy_service.get_proxy_cache()
 
