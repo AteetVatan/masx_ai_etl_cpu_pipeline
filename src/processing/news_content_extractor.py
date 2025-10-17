@@ -88,7 +88,7 @@ class NewsContentExtractor:
         Use BeautifulSoup first, fallback to Crawl4AI if needed.
         """
         try:
-            url = "https://www.ihu.unisinos.br/656066-negacionismo-parlamentar-poe-no-lixo-44-anos-da-politica-ambiental-brasileira-e-pl-da-devastacao-abre-brecha-a-criacao-de-vales-da-morte-de-norte-a-sul-entrevista-especial-com-suely-araujo"
+            #url = "https://www.ihu.unisinos.br/656066-negacionismo-parlamentar-poe-no-lixo-44-anos-da-politica-ambiental-brasileira-e-pl-da-devastacao-abre-brecha-a-criacao-de-vales-da-morte-de-norte-a-sul-entrevista-especial-com-suely-araujo"
 
             # url = await WebScraperUtils.resolve_news_url_async(url)
             # url = "https://mbd.baidu.com/newspage/data/landingsuper?context=%7B%22nid%22%3A%22news_8662219630019457105%22,%22sourceFrom%22%3A%22wise_feedlist%22%7D"
@@ -125,6 +125,8 @@ class NewsContentExtractor:
                 f"NewsContentExtractor:[Fallback] Invoking Crawl4AI for: {url}"
             )
             try:
+                url = "https://www.ihu.unisinos.br/656066-negacionismo-parlamentar-poe-no-lixo-44-anos-da-politica-ambiental-brasileira-e-pl-da-devastacao-abre-brecha-a-criacao-de-vales-da-morte-de-norte-a-sul-entrevista-especial-com-suely-araujo"
+
                 proxy = choice(proxies)
                 crawl_result: ExtractResult = (
                     await self.crawl4AIExtractor.crawl4ai_scrape_with_retry(url)
