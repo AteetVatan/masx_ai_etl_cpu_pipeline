@@ -354,7 +354,7 @@ class PipelineManager:
         # 3.Sanity limits and logging
         # ------------------------------------------------------------------
         batch_size = max(4, min(batch_size, 64))  # hard ceiling for Playwright stability
-        self.logger.info(
+        logger.info(
             f"Calculated optimal Playwright-safe batch size: {batch_size} "
             f"(CPU cores={cpu_cores}, Mem={total_mem_gb:.1f} GB)"
         )
