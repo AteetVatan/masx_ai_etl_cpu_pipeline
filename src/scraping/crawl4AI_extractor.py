@@ -180,6 +180,20 @@ class Crawl4AIExtractor:
             cache_mode=CacheMode.BYPASS,  # or SMART if you want caching
         )
         return config
+    
+    def _get_crawl4ai_browser_config(self):
+        browser_cfg = BrowserConfig(
+            headless=True,
+            extra_args=[
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+                "--disable-setuid-sandbox",
+                "--disable-software-rasterizer",
+            ],
+        )
+        return browser_cfg
+    
 
     async def crawl4ai_scrape(
         self, url: str, timeout_sec: int = 3600,  # maximum 1 minute
@@ -189,7 +203,7 @@ class Crawl4AIExtractor:
 
             config = self._get_crawl4ai_config()
             async with AsyncWebCrawler() as crawler:
-                result = await crawler.arun(url=url, config=config, timeout=timeout_sec)
+                result = await crawler.arun(url=url, config=config, browser_config=self._get_crawl4ai_browser_config(), timeout=timeout_sec)
             if not result:
                 raise RuntimeError("Crawler returned no result")
 
@@ -240,7 +254,10 @@ class Crawl4AIExtractor:
             try:
                 async with AsyncWebCrawler() as crawler:
                     result = await crawler.arun(
-                        url=url, config=config, timeout=timeout_sec
+                        url=url,
+                        config=config, 
+                        browser_config=self._get_crawl4ai_browser_config(),
+                        timeout=timeout_sec
                     )
                 if not result:
                     raise RuntimeError("Crawler returned no result")
