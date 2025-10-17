@@ -11,7 +11,8 @@ from datetime import datetime, timedelta
 
 
 from src.db import db_connection, DatabaseError
-from src.models.feed_models import FeedModel
+#from src.models.feed_models import FeedModel
+from ..models.feed_models import FeedModel
 from src.config import get_service_logger
 from src.utils import validate_and_raise
 from src.services import ProxyService

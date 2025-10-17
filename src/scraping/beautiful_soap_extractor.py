@@ -17,7 +17,8 @@ from bs4 import BeautifulSoup, Comment
 from bs4.element import NavigableString
 
 from src.config import get_settings, get_service_logger
-from src.models.extract_result import ExtractResult
+#from src.models.extract_result import ExtractResult
+from ..models.extract_result import ExtractResult
 
 
 logger = get_service_logger(__name__)

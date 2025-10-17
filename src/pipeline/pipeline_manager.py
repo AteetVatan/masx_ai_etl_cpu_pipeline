@@ -30,10 +30,14 @@ from src.config import get_service_logger, get_settings
 #     EntityModel,
 #     GeoEntity,
 # )
-from src.models.feed_models import FeedModel
-from src.models.extract_result import ExtractResult
-from src.models.entity_model import EntityModel
-from src.models.geo_entity import GeoEntity
+#from src.models.feed_models import FeedModel
+from ..models.feed_models import FeedModel
+#from src.models.extract_result import ExtractResult
+from ..models.extract_result import ExtractResult
+#from src.models.entity_model import EntityModel
+from ..models.entity_model import EntityModel
+#from src.models.geo_entity import GeoEntity
+from ..models.geo_entity import GeoEntity
 
 from src.utils import NlpUtils, LanguageUtils
 

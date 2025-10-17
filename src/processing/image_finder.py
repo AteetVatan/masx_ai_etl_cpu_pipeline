@@ -15,9 +15,12 @@ from ddgs.exceptions import DDGSException
 from babel.core import get_global
 
 from src.config import get_settings, get_service_logger
-from src.models.extract_result import ExtractResult
-from src.models.entity_model import EntityModel
-from src.models.entity_model import EntityAttributes
+#from src.models.extract_result import ExtractResult
+from ..models.extract_result import ExtractResult
+#from src.models.entity_model import EntityModel
+from ..models.entity_model import EntityModel
+#from src.models.entity_model import EntityAttributes
+from ..models.entity_model import EntityAttributes
 
 
 logger = get_service_logger(__name__)
