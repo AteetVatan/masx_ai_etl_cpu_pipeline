@@ -189,13 +189,6 @@ test_data/
 test_articles/
 test_images/
 
-# Model files (if large)
-models/
-*.model
-*.bin
-*.h5
-*.pkl
-*.joblib
 
 # Cache directories
 .cache/
