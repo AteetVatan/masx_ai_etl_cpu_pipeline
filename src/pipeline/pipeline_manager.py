@@ -11,7 +11,7 @@ import os
 from typing import Dict, Any, List, Optional, Tuple
 import random
 from datetime import datetime
-
+import psutil
 
 from src.db import db_connection, DatabaseError
 from src.processing import (
@@ -307,31 +307,60 @@ class PipelineManager:
 
     def _calculate_optimal_batch_size(self, total_articles: int) -> int:
         """
-        Calculate optimal batch size based on system resources and article count.
+        To achieve the best performance, 
+        we need to calculate the optimal batch size based on the CPU cores, memory, and total article count.
+        Dynamically calculate an optimal Playwright-safe batch size based on
+        CPU cores, memory, and total article count.
+
+        Keeps concurrency below levels that could trigger 'fork: Resource temporarily unavailable'
+        or Playwright context exhaustion.
 
         Args:
-            total_articles: Total number of articles to process
+            total_articles: Total number of articles to process.
 
         Returns:
-            Optimal batch size for processing
+            int: Optimal batch size for parallel processing.
         """
-        # Base batch size on available CPU cores and thread pool capacity
+    
+
         cpu_cores = os.cpu_count() or 4
-        max_workers = self.max_workers
+        max_workers = self.max_workers or cpu_cores
 
-        # Calculate base batch size (2-3x the number of workers for good throughput)
-        base_batch_size = max_workers * 2
+        # ------------------------------------------------------------------
+        # 1. Determine system capacity heuristics
+        # ------------------------------------------------------------------
+        # Safe concurrent browsers per system (Playwright heavy I/O): ~1 per 2–4 cores
+        safe_concurrent_browsers = max(2, min(cpu_cores // 2, 16))
 
-        # Adjust based on total articles
+        # Each browser may use ~600–800 MB RAM → derive from available memory
+        total_mem_gb = psutil.virtual_memory().total / (1024 ** 3)
+        mem_limited_batch = int((total_mem_gb // 2) * 4)  # ≈4 per 2 GB RAM
+        safe_batch_limit = min(safe_concurrent_browsers * 2, mem_limited_batch)
+
+        # ------------------------------------------------------------------
+        # 2. Compute base batch size relative to workload
+        # ------------------------------------------------------------------
         if total_articles <= 10:
-            return min(total_articles, 5)  # Small batches for small workloads
+            batch_size = min(total_articles, 4)
         elif total_articles <= 50:
-            return min(base_batch_size, total_articles)
+            batch_size = min(total_articles, safe_batch_limit)
         elif total_articles <= 200:
-            return min(base_batch_size * 2, total_articles)
+            batch_size = min(total_articles, safe_batch_limit * 2)
         else:
-            # For large workloads, use larger batches but cap at reasonable size
-            return min(base_batch_size * 3, 100)
+            # Cap large workloads to avoid excessive forks
+            batch_size = min(total_articles, safe_batch_limit * 3, 64)
+
+        # ------------------------------------------------------------------
+        # 3.Sanity limits and logging
+        # ------------------------------------------------------------------
+        batch_size = max(4, min(batch_size, 64))  # hard ceiling for Playwright stability
+        self.logger.info(
+            f"Calculated optimal Playwright-safe batch size: {batch_size} "
+            f"(CPU cores={cpu_cores}, Mem={total_mem_gb:.1f} GB)"
+        )
+
+        return batch_size
+
 
     def _create_sub_batches(
         self, article_data_list: List[FeedModel], batch_size: int
