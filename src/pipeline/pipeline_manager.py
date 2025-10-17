@@ -11,7 +11,7 @@ import os
 from typing import Dict, Any, List, Optional, Tuple
 import random
 from datetime import datetime
-import psutil
+
 
 from src.db import db_connection, DatabaseError
 from src.processing import (
@@ -307,60 +307,38 @@ class PipelineManager:
 
     def _calculate_optimal_batch_size(self, total_articles: int) -> int:
         """
-        To achieve the best performance, 
-        we need to calculate the optimal batch size based on the CPU cores, memory, and total article count.
-        Dynamically calculate an optimal Playwright-safe batch size based on
-        CPU cores, memory, and total article count.
-
-        Keeps concurrency below levels that could trigger 'fork: Resource temporarily unavailable'
-        or Playwright context exhaustion.
+        Calculate optimal batch size based on system resources and article count.
 
         Args:
-            total_articles: Total number of articles to process.
+            total_articles: Total number of articles to process
 
         Returns:
-            int: Optimal batch size for parallel processing.
+            Optimal batch size for processing
         """
-    
-
+        # Base batch size on available CPU cores and thread pool capacity
         cpu_cores = os.cpu_count() or 4
-        max_workers = self.max_workers or cpu_cores
+        max_workers = self.max_workers
 
-        # ------------------------------------------------------------------
-        # 1. Determine system capacity heuristics
-        # ------------------------------------------------------------------
-        # Safe concurrent browsers per system (Playwright heavy I/O): ~1 per 2–4 cores
-        safe_concurrent_browsers = max(2, min(cpu_cores // 2, 16))
+        # Calculate base batch size (2-3x the number of workers for good throughput)
+        base_batch_size = max_workers * 2
+        
+        batch_size = 6
 
-        # Each browser may use ~600–800 MB RAM → derive from available memory
-        total_mem_gb = psutil.virtual_memory().total / (1024 ** 3)
-        mem_limited_batch = int((total_mem_gb // 2) * 4)  # ≈4 per 2 GB RAM
-        safe_batch_limit = min(safe_concurrent_browsers * 2, mem_limited_batch)
-
-        # ------------------------------------------------------------------
-        # 2. Compute base batch size relative to workload
-        # ------------------------------------------------------------------
+        # Adjust based on total articles
         if total_articles <= 10:
-            batch_size = min(total_articles, 4)
+            batch_size = min(total_articles, 5)  # Small batches for small workloads
         elif total_articles <= 50:
-            batch_size = min(total_articles, safe_batch_limit)
+            batch_size = min(base_batch_size, total_articles)
         elif total_articles <= 200:
-            batch_size = min(total_articles, safe_batch_limit * 2)
+            batch_size = min(base_batch_size * 2, total_articles)
         else:
-            # Cap large workloads to avoid excessive forks
-            batch_size = min(total_articles, safe_batch_limit * 3, 64)
-
-        # ------------------------------------------------------------------
-        # 3.Sanity limits and logging
-        # ------------------------------------------------------------------
-        batch_size = max(4, min(batch_size, 64))  # hard ceiling for Playwright stability
-        logger.info(
-            f"Calculated optimal Playwright-safe batch size: {batch_size} "
-            f"(CPU cores={cpu_cores}, Mem={total_mem_gb:.1f} GB)"
-        )
-
+            # For large workloads, use larger batches but cap at reasonable size
+            batch_size = min(base_batch_size * 3, 100)
+        
+        logger.info(f"Calculated optimal batch size: {batch_size}")
         return batch_size
-
+        
+        
 
     def _create_sub_batches(
         self, article_data_list: List[FeedModel], batch_size: int
@@ -469,6 +447,8 @@ class PipelineManager:
             extracted_data: ExtractResult = (
                 await self.news_content_extractor.extract_feed(extracted_data.url)
             )
+            if not extracted_data:
+                raise Exception("Failed to scrape article")
             return extracted_data
         except Exception as e:
             logger.error(f"Fallback scraper also failed for {extracted_data.ur}: {e}")
