@@ -20,7 +20,7 @@ from pydantic import BaseModel
 from src.config import get_settings, get_api_logger
 from src.utils import validate_and_raise, get_today_date
 
-from src.db import DatabaseClientAndPool, DatabaseError
+from src.db import DatabaseError
 
 
 logger = get_api_logger(__name__)
@@ -105,7 +105,7 @@ class FeedProcessFlashpointResponse(BaseModel):
 async def lifespan(app: FastAPI):
     """Manage application startup and shutdown."""
     logger.info("Starting MASX AI ETL CPU Pipeline server")
-    from src.db import db_connection, DatabaseClientAndPool, DatabaseError
+    from src.db import db_connection
     from src.pipeline import pipeline_manager
     from src.processing import feed_processor
 
@@ -325,7 +325,7 @@ async def get_stats():
 
 @app.post("/feed/warmup", response_model=FeedWarmupResponse)
 async def warmup_feed_entries(
-    request: FeedWarmupRequest, db: DatabaseClientAndPool = Depends(get_db_client)
+    request: FeedWarmupRequest
 ):
     """
     Warm up the server by loading feed entries for a specific date.
