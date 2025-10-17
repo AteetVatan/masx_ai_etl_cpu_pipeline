@@ -17,33 +17,6 @@ from src.config import get_service_logger, get_settings
 settings = get_settings()
 
 
-async def wait_for_startup_dependencies(max_retries: int = 5, delay: int = 5):
-    """
-    Wait for critical dependencies like Supabase/Postgres to become available.
-
-    Args:
-        max_retries (int): Number of retries before giving up.
-        delay (int): Seconds between retries.
-    """
-    from src.db import db_connection
-
-    for attempt in range(1, max_retries + 1):
-        try:
-            print(f"[INIT] Checking database connection (attempt {attempt}/{max_retries})...")
-            await db_connection.connect()
-            await db_connection.disconnect()
-            print("[INIT] Database connection OK")
-            return
-        except Exception as e:
-            print(f"[INIT] Database not ready yet: {e}")
-            if attempt < max_retries:
-                print(f"[INIT] Retrying in {delay}s...")
-                await asyncio.sleep(delay)
-            else:
-                print("[INIT] Database connection failed after max retries ❌")
-                sys.exit(1)
-
-
 def print_startup_info():
     """Print startup configuration for visibility."""
     print("MASX AI ETL CPU Pipeline")
@@ -70,13 +43,6 @@ def main():
     logger = get_service_logger(__name__)
     print_startup_info()
 
-    # Run async dependency check
-    # try:
-    #     asyncio.run(wait_for_startup_dependencies(max_retries=6, delay=6))
-    # except Exception as e:
-    #     logger.error(f"Startup dependency check failed: {e}", exc_info=True)
-    #     sys.exit(1)
-
     app_path = "src.api.server:app"
     uvicorn_config = {
         "app": app_path,
@@ -90,18 +56,7 @@ def main():
     }
 
     try:
-        logger.info("Starting MASX AI ETL CPU Pipeline FastAPI server...")
-        
-        if not settings.debug:
-            #os.chdir("/app")
-            from pathlib import Path
-            ROOT = Path(__file__).resolve().parent
-            SRC = ROOT / "src"
-            for p in (str(ROOT), str(SRC)):
-                if p not in sys.path:
-                    sys.path.insert(0, p)
-            os.chdir(str(ROOT))
-        
+        logger.info("Starting MASX AI ETL CPU Pipeline FastAPI server...")        
         uvicorn.run(**uvicorn_config)
     except KeyboardInterrupt:
         print("\n🧹 Server stopped by user")

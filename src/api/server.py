@@ -362,8 +362,7 @@ async def warmup_feed_entries(
 @app.post("/feed/process", response_model=FeedProcessResponse)
 async def process_feed_entries(
     request: FeedProcessRequest,
-    background_tasks: BackgroundTasks,
-    db: DatabaseClientAndPool = Depends(get_db_client),
+    background_tasks: BackgroundTasks
 ):
     """
     Process all feed entries for a specific date.
@@ -419,8 +418,7 @@ async def process_feed_entries(
 @app.post("/feed/process/flashpoint", response_model=FeedProcessFlashpointResponse)
 async def process_feed_entries_by_flashpoint(
     request: FeedProcessFlashpointRequest,
-    background_tasks: BackgroundTasks,
-    db: DatabaseClientAndPool = Depends(get_db_client),
+    background_tasks: BackgroundTasks
 ):
     """
     Process feed entries for a specific date and flashpoint ID.
@@ -486,7 +484,7 @@ async def process_feed_entries_by_flashpoint(
 
 @app.get("/feed/entries/{date}")
 async def get_feed_entries(
-    date: str, db: DatabaseClientAndPool = Depends(get_db_client)
+    date: str
 ):
     """
     Get loaded feed entries for a specific date.
