@@ -316,6 +316,9 @@ class PipelineManager:
             Optimal batch size for processing
         """
         # Base batch size on available CPU cores and thread pool capacity
+        
+        return 6
+        
         cpu_cores = os.cpu_count() or 4
         max_workers = self.max_workers
 
