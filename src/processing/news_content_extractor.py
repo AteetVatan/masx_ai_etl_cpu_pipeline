@@ -77,7 +77,7 @@ class NewsContentExtractor:
             self.logger.error(
                 f"news_content_extractor.py:NewsContentExtractor:Batch processing failed: {e}"
             )
-            return []
+            return None
         finally:
             pass
 
@@ -88,7 +88,7 @@ class NewsContentExtractor:
         Use BeautifulSoup first, fallback to Crawl4AI if needed.
         """
         try:
-            # url = "https://www.ihu.unisinos.br/656066-negacionismo-parlamentar-poe-no-lixo-44-anos-da-politica-ambiental-brasileira-e-pl-da-devastacao-abre-brecha-a-criacao-de-vales-da-morte-de-norte-a-sul-entrevista-especial-com-suely-araujo"
+            url = "https://www.ihu.unisinos.br/656066-negacionismo-parlamentar-poe-no-lixo-44-anos-da-politica-ambiental-brasileira-e-pl-da-devastacao-abre-brecha-a-criacao-de-vales-da-morte-de-norte-a-sul-entrevista-especial-com-suely-araujo"
 
             # url = await WebScraperUtils.resolve_news_url_async(url)
             # url = "https://mbd.baidu.com/newspage/data/landingsuper?context=%7B%22nid%22%3A%22news_8662219630019457105%22,%22sourceFrom%22%3A%22wise_feedlist%22%7D"
@@ -138,7 +138,6 @@ class NewsContentExtractor:
 
                 # if traf_result is not None, then merge traf_result and crawl_result
                 final_result = self._merge_results(traf_result, crawl_result)
-
                 return final_result
             except Exception as c4_err:
                 self.logger.error(
