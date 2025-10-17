@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "masx_ai_etl_cpu_pipeline"
+version = "1.0.0"
+description = "MASX AI ETL CPU Pipeline - FastAPI service for multilingual news processing"
+authors = [
+    { name="Ateet Vatan Bahmani", email="ab@masxai.com" }
+]
+requires-python = ">=3.12"
+
+[tool.setuptools]
+packages = ["src"]

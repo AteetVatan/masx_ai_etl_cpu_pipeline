@@ -29,6 +29,7 @@ RUN python -m pip install --upgrade pip==24.2 && \
 
 # Copy all project files
 COPY . .
+RUN pip install -e .
 
 # Expose FastAPI port
 EXPOSE 8000
