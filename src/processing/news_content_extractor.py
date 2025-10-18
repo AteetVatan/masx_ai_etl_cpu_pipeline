@@ -77,7 +77,7 @@ class NewsContentExtractor:
             self.logger.error(
                 f"news_content_extractor.py:NewsContentExtractor:Batch processing failed: {e}"
             )
-            return None
+            raise Exception(f"extract_feed processing failed: {e}")
         finally:
             pass
 
@@ -138,19 +138,26 @@ class NewsContentExtractor:
 
                 # if traf_result is not None, then merge traf_result and crawl_result
                 final_result = self._merge_results(traf_result, crawl_result)
+                if final_result:
+                    self.logger.info(f"Ateet crawl4ai successfull")
+                else:
+                    self.logger.error(f"Ateet crawl4ai failed")
+                    
+                    
                 return final_result
+               
             except Exception as c4_err:
                 self.logger.error(
                     f"news_content_extractor.py:NewsContentExtractor:Crawl4AI scraping failed for {url}: {c4_err}"
                 )
-                return None
+                raise Exception(f"Crawl4AI scraping failed for {url}: {c4_err}")
 
         except Exception as e:
             self.logger.error(
                 f"news_content_extractor.py:NewsContentExtractor:[Error] Failed to scrape {url}: {e}",
                 exc_info=True,
             )
-            return None
+            raise Exception(f"Failed to scrape {url}: {e}")
 
     def _merge_results(
         self, traf_result: ExtractResult, crawl_result: ExtractResult

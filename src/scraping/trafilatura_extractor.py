@@ -210,7 +210,7 @@ class TrafilaturaExtractor:
             )
             return result
         except Exception as e:
-            self.logger.error(f"Failed to scrape {url}: {e}")
+            logger.error(f"Failed to scrape {url}: {e}")
             return None
 
     def just_scrape(self, url, proxy):
@@ -229,7 +229,7 @@ class TrafilaturaExtractor:
             response.raise_for_status()
             return response.content
         except Exception as e:
-            self.logger.error(f"Failed to scrape {url}: {e}")
+            logger.error(f"Failed to scrape {url}: {e}")
             return None
 
     @staticmethod
