@@ -105,7 +105,7 @@ class TrafilaturaExtractor:
                 # fetch_url is synchronous → wrap with to_thread to avoid blocking event loop
                 downloaded = await asyncio.wait_for(
                     asyncio.to_thread(trafilatura.fetch_url, url, config=self._config),
-                    timeout=10,
+                    timeout=5,
                 )
 
                 if not downloaded:

@@ -267,15 +267,7 @@ class Crawl4AIExtractor:
                 if not result.success:
                     raise RuntimeError(
                         f"Crawl failed with error: {result.error_message or 'unknown error'}"
-                    )
-                    
-                
-                if result.success:
-                    self.logger.info(f"Ateet -------")
-                    self.logger.info(result.cleaned_html)
-                               
-                
-                
+                    )  
 
                 scrap_result: ExtractResult = await self.trafilatura_from_html(
                     result.cleaned_html, url
