@@ -317,7 +317,7 @@ class PipelineManager:
         """
         # Base batch size on available CPU cores and thread pool capacity
         
-        return 1
+        return self.max_workers
         
         cpu_cores = os.cpu_count() or 4
         max_workers = self.max_workers
