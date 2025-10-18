@@ -373,8 +373,8 @@ class FeedProcessor:
                     "processing_time": (datetime.utcnow() - start_time).total_seconds(),
                 }
 
-            if self.settings.prosess_articles_limit > 0:
-                article_data_list = article_data_list[:self.settings.prosess_articles_limit]
+            if self.settings.process_articles_limit > 0:
+                article_data_list = article_data_list[:self.settings.process_articles_limit]
             else:
                 article_data_list = article_data_list
 
