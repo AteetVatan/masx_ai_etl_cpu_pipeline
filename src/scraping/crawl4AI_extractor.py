@@ -129,8 +129,8 @@ class Crawl4AIExtractor:
     async def crawl4ai_scrape_with_retry(
         self,
         url: str,
-        max_retries: int = 1,
-        timeout_sec: int = 3600,  # maximum 1 minute
+        max_retries: int = 3,
+        timeout_sec: int = 60000,  # maximum 1 minute
     ) -> ExtractResult:
         from src.scraping import WebScraperUtils
 
@@ -169,11 +169,11 @@ class Crawl4AIExtractor:
 
             except TimeoutError:
                 self.logger.warning(
-                    f"crawl4AI_extractor.py:Crawl4AIExtractor:Attempt {attempt} timed out after {timeout_sec}s for URL: {url}"
+                    f"crawl4AI_extractor.py:Crawl4AIExtractor:Attempt {attempt} timed out after {timeout_sec}s"
                 )
             except Exception as e:
                 self.logger.error(
-                    f"crawl4AI_extractor.py:Crawl4AIExtractor:Attempt {attempt} failed for URL {url}: {e}"
+                    f"crawl4AI_extractor.py:Crawl4AIExtractor:Attempt {attempt} failed : {e}"
                 )
 
             # after last attempt
@@ -181,7 +181,7 @@ class Crawl4AIExtractor:
                 await asyncio.sleep(2**attempt)  # exponential back-off
 
         self.logger.error(
-            f"crawl4AI_extractor.py:Crawl4AIExtractor:All {max_retries} crawl attempts failed for URL: {url}"
+            f"crawl4AI_extractor.py:Crawl4AIExtractor:All {max_retries} crawl attempts failed"
         )
         return None
 

@@ -126,7 +126,7 @@ class NewsContentExtractor:
             try:               
                 proxy = choice(proxies)
                 crawl_result: ExtractResult = (
-                    await self.crawl4AIExtractor.crawl4ai_scrape(url)
+                    await self.crawl4AIExtractor.crawl4ai_scrape_with_retry(url)
                 )
                 if not crawl_result:  # sanity check
                     raise ValueError("Crawl4AI returned empty or too short content.")
