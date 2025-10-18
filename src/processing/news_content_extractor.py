@@ -31,7 +31,6 @@ from src.scraping import (
     Crawl4AIExtractor,
     BeautifulSoupExtractor,
     TrafilaturaExtractor,
-    get_final_url,
 )
 from src.scraping import WebScraperUtils
 
@@ -127,7 +126,7 @@ class NewsContentExtractor:
             try:               
                 proxy = choice(proxies)
                 crawl_result: ExtractResult = (
-                    await self.crawl4AIExtractor.crawl4ai_scrape_with_retry(url)
+                    await self.crawl4AIExtractor.crawl4ai_scrape(url)
                 )
                 if not crawl_result:  # sanity check
                     raise ValueError("Crawl4AI returned empty or too short content.")

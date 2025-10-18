@@ -29,183 +29,67 @@ from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
 from src.models import ExtractResult
 from src.config import get_service_logger
-import requests
+from .crawl4AI_extractor_configs import Crawl4AIExtractorConfigs as c4a_configs
 
 class Crawl4AIExtractor:
     """
     This class contains the Crawl4AIExtractor class, which is a class that extracts content from a URL using the Crawl4AI API.
     """
 
-    def __init__(self):
+    def __init__(self, proxy: dict | None = None):
         self.logger = get_service_logger("Crawl4AIExtractor")
+        self.proxy = proxy
 
-    def _get_crawl4ai_config(self):
-        """
-        Get the Crawl4AI configuration.
-        """
-        # prune_filter = PruningContentFilter(
-        #     threshold_type="dynamic",
-        #     threshold=0.4,
-        #     min_word_threshold=60,   # a bit higher to drop boilerplate
-        # )
 
-        prune_filter = PruningContentFilter(
-            threshold=0.20,  # Lower value retains more text
-            threshold_type="fixed",  # Try switching from "dynamic" to "fixed"
-            min_word_threshold=25,  # Increase threshold to focus on denser blocks
-        )
-
-        # md_generator = DefaultMarkdownGenerator(
-        #     content_filter=prune_filter,
-        #     options={"ignore_links": True, "ignore_images": True, "escape_html": True},
-        # )
-
-        md_generator = DefaultMarkdownGenerator(
-            content_filter=prune_filter,
-            options={"ignore_links": True, "escape_html": True},
-        )
-
-        c4a_script = """# Give banners time to render
-        WAIT 2
-        
-        # Block navigation events that cause content changes
-        EVAL `(() => {
-            // Prevent navigation events
-            window.addEventListener('beforeunload', (e) => e.preventDefault());
-            window.addEventListener('unload', (e) => e.preventDefault());
-            
-            // Disable auto-refresh and navigation
-            if (window.location.href.includes('news.google.com')) {
-                // Google News specific handling
-                const observer = new MutationObserver(() => {
-                    // Block any navigation attempts
-                    if (window.location.href !== window.location.href) {
-                        window.stop();
-                    }
-                });
-                observer.observe(document, {subtree: true, childList: true});
-            }
-        })()`
-
-        # OneTrust accept
-        IF (EXISTS `#onetrust-accept-btn-handler, .onetrust-accept-btn-handler`) THEN CLICK `#onetrust-accept-btn-handler, .onetrust-accept-btn-handler`
-
-        # Quantcast accept
-        IF (EXISTS `.qc-cmp2-container, .qc-cmp2-ui, .qc-cmp2-summary`) THEN CLICK `.qc-cmp2-accept-all, .qc-cmp2-summary-buttons .qc-cmp2-accept-all`
-
-        # Generic cookie banners
-        IF (EXISTS `[id*="cookie"], [class*="cookie"], .consent-banner`) THEN CLICK `.accept, .accept-all, [data-testid*="accept"]`
-
-        # Fallback: click any visible button whose text contains "accept" (JS must use EVAL)
-        EVAL `(() => {
-        const btns = Array.from(document.querySelectorAll('button, [role="button"]'));
-        const el = btns.find(b => /accept/i.test(b.textContent || ''));
-        if (el) el.click();
-        })()`
-
-        # Remove overlays and unlock scroll (if site set overflow:hidden/backdrops)
-        EVAL `(() => {
-        const rm = s => document.querySelectorAll(s).forEach(el => el.remove());
-        rm('#onetrust-banner-sdk, .onetrust-pc-dark-filter, .onetrust-pc-lightbox, .qc-cmp2-container, .qc-cmp2-ui, .qc-cmp2-summary, .consent-banner, [id*="cookie"], [class*="cookie"], .backdrop, .modal, .overlay');
-        [document.documentElement, document.body].forEach(el => { el.style.overflow='visible'; el.style.position='static'; el.classList.remove('modal-open','scroll-locked'); });
-        })()`
-
-        # Let layout settle
-        WAIT 0.5
-        """
-
-        # readiness probe for main content
-        wait_for = "js:(() => !!document.querySelector('main, article, [role=main], .article, .article-body'))"
-
-        generic_ready = """js:() => {
-        // one-time setup
-        if (!window.__masx) {
-            window.__masx = {
-            lastMut: performance.now(),
-            stableMs: 1000,  // Increased stability window
-            textMin: 300,    // Lower text requirement
-            pMin: 2,         // Lower paragraph requirement
-            navBlocked: false
-            };
-            const obs = new MutationObserver(() => { window.__masx.lastMut = performance.now(); });
-            obs.observe(document, {subtree: true, childList: true, characterData: true, attributes: true});
-        }
-
-        if (document.readyState === 'loading' || !document.body) return false;
-
-        // 1) Fast-path: if a landmark exists, we’re good
-        const landmark = document.querySelector('main, article, [role=main], .article, .article-body, [itemprop="articleBody"]');
-        if (landmark) {
-            // require a tiny calm window so we don't read mid-route
-            return performance.now() - window.__masx.lastMut > window.__masx.stableMs;
-        }
-
-        // 2) Otherwise rely on **lightweight** density checks (avoid innerText each poll)
-        // Use a capped sample of textContent to reduce layout cost
-        const tc = (document.body.textContent || '').trim();
-        const textLen = tc.length;
-        const pCount  = document.getElementsByTagName('p').length;
-
-        const contentful = (textLen >= window.__masx.textMin) || (pCount >= window.__masx.pMin);
-
-        // 3) Require short stability window
-        const stable = performance.now() - window.__masx.lastMut > window.__masx.stableMs;
-        return contentful && stable;
-        }"""
-
-        config = CrawlerRunConfig(
-            markdown_generator=md_generator,
-            wait_for=generic_ready,
-            # wait_for_images=True,
-            # adjust_viewport_to_content=True,
-            # wait_for='js:() => !!document.querySelector("main, article, [role=\'main\'], .article, .article-body")',
-            delay_before_return_html=2.5,  # <-- the “works in debug” delay, but explicit
-            page_timeout=60000,  # ms — give slow SPAs time to settle
-            scan_full_page=True,  # crawl beyond just the viewport
-            # 1) Remove whole tags up front (kills inline JSON, scripts, styles)
-            excluded_tags=["script", "style", "noscript"],
-            # 2) Drop obvious chrome/banners/footers/headers
-            # excluded_selector="header, footer, #cookie-banner, .cookie-banner, .consent-banner, .gdpr, .ads, .advert, .newsletter",
-            excluded_selector=(
-                "header, footer, nav, aside, "
-                "#cookie-banner, .cookie-banner, .consent-banner, .gdpr, "
-                ".cmp-container, .ads, .advert, .newsletter, .subscribe, "
-                "[data-testid*='navigation'], [role='navigation']"
-            ),
-            # 3) Skip trivial text blocks (great for boilerplate)
-            word_count_threshold=50,
-            # 4) (Optional) interact to clear overlays
-            c4a_script=c4a_script,
-            # 5) Stable, reproducible runs
-            cache_mode=CacheMode.BYPASS,  # or SMART if you want caching
-        )
-        return config
-    
-    def _get_crawl4ai_browser_config(self):
-        browser_cfg = BrowserConfig(
-            headless=True,
-            extra_args=[
-                "--no-sandbox",
-                "--disable-dev-shm-usage",
-                "--disable-gpu",
-                "--disable-setuid-sandbox",
-                "--disable-software-rasterizer",
-            ],
-            ignore_https_errors=True,
-            enable_stealth=True,  # helps bypass bot detection
-        )
-        return browser_cfg
-    
+    async def _try_once(self, url: str, browser_cfg: BrowserConfig, run_cfg: CrawlerRunConfig, timeout_sec: int):        
+        async with AsyncWebCrawler() as crawler:
+            return await crawler.arun(url=url,browser_config=browser_cfg, config=run_cfg, timeout=timeout_sec)
 
     async def crawl4ai_scrape(
+        self, url: str, timeout_sec: int = 3600
+    ):
+        from src.scraping import WebScraperUtils  # your existing utility
+
+        #is_gnews = c4a_configs.is_google_news_url(url)
+        #run_cfg = c4a_configs.get_run_config(is_gnews)
+        run_cfg = c4a_configs.get_crawl4ai_config()
+        browsers = c4a_configs.get_browser_presets()
+
+        last_err = None
+        browser_config_index = 0
+        for browser_cfg in browsers:
+            try:
+                browser_config_index += 1
+                result = await self._try_once(url, browser_cfg, run_cfg, timeout_sec)               
+                if not result or not result.success:
+                    raise RuntimeError(result.error_message or "unknown error")
+
+                scrap_result = await self.trafilatura_from_html(result.cleaned_html, url)
+                cleaned = WebScraperUtils.remove_ui_junk(scrap_result.content)
+                scrap_result.content = "error_pattern_found" if WebScraperUtils.find_error_pattern(cleaned) else cleaned
+                scrap_result.word_count = len(scrap_result.content.split())
+                return scrap_result
+
+            except Exception as e:
+                self.logger.error(f"[C4AI] Error for browser config {browser_config_index}: {e}")
+                last_err = e
+                #await asyncio.sleep(1.5)
+
+        self.logger.error(f"[C4AI] All attempts failed for {url}: {last_err}")
+        return None
+
+
+    
+
+    async def crawl4ai_scrape_old(
         self, url: str, timeout_sec: int = 3600,  # maximum 1 minute
     ) -> ExtractResult:
         try:
             from src.scraping import WebScraperUtils
 
-            config = self._get_crawl4ai_config()
+            config = c4a_configs.get_crawl4ai_config()
             async with AsyncWebCrawler() as crawler:
-                result = await crawler.arun(url=url, config=config, browser_config=self._get_crawl4ai_browser_config(), timeout=timeout_sec)
+                result = await crawler.arun(url=url, config=config, browser_config=c4a_configs.get_crawl4ai_browser_config(), timeout=timeout_sec)
             if not result:
                 raise RuntimeError("Crawler returned no result")
 
@@ -250,7 +134,7 @@ class Crawl4AIExtractor:
     ) -> ExtractResult:
         from src.scraping import WebScraperUtils
 
-        config = self._get_crawl4ai_config()
+        config = c4a_configs.get_crawl4ai_config()
 
         for attempt in range(1, max_retries + 1):
             try:
@@ -258,7 +142,7 @@ class Crawl4AIExtractor:
                     result = await crawler.arun(
                         url=url,
                         config=config, 
-                        browser_config=self._get_crawl4ai_browser_config(),
+                        browser_config=c4a_configs.get_crawl4ai_browser_config(),
                         timeout=timeout_sec
                     )
                 if not result:
