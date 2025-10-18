@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     # supabase_anon_key: str = Field(..., description="Supabase anon key")
     # supabase_service_role_key: str = Field(..., description="Supabase service key")
 
+    
+    prosess_articles_limit: int = Field(default=0, description="Number of articles to process")
+    
     # Server Configuration
     api_key: str = Field(default="", description="API key")
     require_api_key: bool = Field(

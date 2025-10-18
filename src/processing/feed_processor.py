@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 
 from src.db import db_connection, DatabaseError
 from src.models import FeedModel
-from src.config import get_service_logger
+from src.config import get_service_logger, get_settings
 from src.utils import validate_and_raise
 from src.services import ProxyService
 
@@ -36,6 +36,7 @@ class FeedProcessor:
 
     def __init__(self):
         """Initialize the feed processor."""
+        self.settings = get_settings()
         self.all_feed_entries: Dict[str, List[Dict[str, Any]]] = {}
         self.processing_stats = {
             "total_loaded": 0,
@@ -372,7 +373,10 @@ class FeedProcessor:
                     "processing_time": (datetime.utcnow() - start_time).total_seconds(),
                 }
 
-            article_data_list = article_data_list[:1]
+            if self.settings.prosess_articles_limit > 0:
+                article_data_list = article_data_list[:self.settings.prosess_articles_limit]
+            else:
+                article_data_list = article_data_list
 
             # Process articles in batch
             pipeline_manager = _get_pipeline_manager()
