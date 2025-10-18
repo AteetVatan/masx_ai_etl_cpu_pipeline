@@ -129,21 +129,34 @@ class Crawl4AIExtractor:
     async def crawl4ai_scrape_with_retry(
         self,
         url: str,
+        proxies: list[str] | None = None,
         max_retries: int = 3,
         timeout_sec: int = 60000,  # maximum 1 minute
     ) -> ExtractResult:
         from src.scraping import WebScraperUtils
 
-        config = c4a_configs.get_crawl4ai_config()
+        # import requests
+        # valid_proxies = []
+        # #
+        
+        # for proxy in proxies:
+        #     try:
+        #         r = requests.get("https://httpbin.org/ip", proxies={"http": f"http://{proxy}", "https": f"http://{proxy}"}, timeout=5)
+        #         if r.status_code == 200:
+        #             valid_proxies.append(proxy)
+        #     except Exception as e:
+        #         print(proxy, "FAILED:", e)
 
+        
         for attempt in range(1, max_retries + 1):
             try:
+                config = c4a_configs.get_crawl4ai_config(proxies)
                 async with AsyncWebCrawler() as crawler:
                     result = await crawler.arun(
                         url=url,
                         config=config, 
                         browser_config=c4a_configs.get_crawl4ai_browser_config(),
-                        timeout=timeout_sec
+                        timeout=timeout_sec,
                     )
                 if not result:
                     raise RuntimeError("Crawler returned no result")

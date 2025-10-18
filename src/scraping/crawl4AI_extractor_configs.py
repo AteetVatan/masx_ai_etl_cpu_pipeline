@@ -17,7 +17,7 @@ from urllib.parse import urlparse
 from crawl4ai import CrawlerRunConfig, CacheMode, BrowserConfig, ProxyConfig
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 from crawl4ai.content_filter_strategy import PruningContentFilter
-
+from .simple_proxy_rotator import SimpleProxyRotator
 
 
 
@@ -107,7 +107,8 @@ class Crawl4AIExtractorConfigs:
     # RUN CONFIG PRESETS
     # ------------------------------------------------------------------------------
     @staticmethod
-    def get_crawl4ai_config():
+    def get_crawl4ai_config(proxies: list[str] = None):
+  
         """
         Get the Crawl4AI configuration.
         """
@@ -116,7 +117,12 @@ class Crawl4AIExtractorConfigs:
         #     threshold=0.4,
         #     min_word_threshold=60,   # a bit higher to drop boilerplate
         # )
+        
+        if proxies:
+            rotator = SimpleProxyRotator(proxies)
+       
 
+       
         prune_filter = PruningContentFilter(
             threshold=0.20,  # Lower value retains more text
             threshold_type="fixed",  # Try switching from "dynamic" to "fixed"
@@ -222,6 +228,7 @@ class Crawl4AIExtractorConfigs:
         }"""
 
         config = CrawlerRunConfig(
+            proxy_rotation_strategy=rotator,
             markdown_generator=md_generator,
             wait_for=generic_ready,
             # wait_for_images=True,
