@@ -94,9 +94,12 @@ class TrafilaturaExtractor:
         logger.info(f"[trafilatura] scraping: {url}")
 
         last_err: Optional[BaseException] = None
-        if proxy:
-            os.environ["http_proxy"] = f"http://{proxy}"
-            os.environ["https_proxy"] = f"https://{proxy}"
+        # if proxy:
+        #     os.environ["http_proxy"] = f"http://{proxy}"
+        #     os.environ["https_proxy"] = f"https://{proxy}"
+        
+        
+        #trafilatura.downloads.PROXY_URL = f"http://{proxy}"
 
         for attempt in range(1 + self.max_retries):
             try:

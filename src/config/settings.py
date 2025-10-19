@@ -21,6 +21,14 @@ class Settings(BaseSettings):
 
     
     process_articles_limit: int = Field(default=0, description="Number of articles to process")
+        # Pipeline Configuration
+    max_workers: int = Field(
+        default_factory=lambda: min(32, (os.cpu_count() or 1) * 2),
+        description="Maximum number of worker threads",
+    )
+    db_batch_size: int = Field(
+        default=100, description="Batch size for database operations"
+    )
 
     # Server Configuration
     api_key: str = Field(default="", description="API key")
@@ -49,14 +57,7 @@ class Settings(BaseSettings):
         default=1, description="Minimum number of database connections"
     )
 
-    # Pipeline Configuration
-    max_workers: int = Field(
-        default_factory=lambda: min(32, (os.cpu_count() or 1) * 2),
-        description="Maximum number of worker threads",
-    )
-    batch_size: int = Field(
-        default=100, description="Batch size for database operations"
-    )
+
     request_timeout: int = Field(default=30, description="Request timeout in seconds")
     retry_attempts: int = Field(default=3, description="Number of retry attempts")
     retry_delay: float = Field(

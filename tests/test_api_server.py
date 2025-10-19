@@ -33,7 +33,7 @@ class TestAPIServer:
             db_user="test_user",
             db_password="test_password",
             max_workers=4,
-            batch_size=10,
+            db_batch_size=10,
             request_timeout=10,
             retry_attempts=2,
             retry_delay=0.1,

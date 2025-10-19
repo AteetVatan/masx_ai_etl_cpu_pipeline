@@ -49,7 +49,7 @@ class PipelineManager:
 
     def __init__(self):
         """Initialize the pipeline manager."""
-        self.batch_size = settings.batch_size
+        self.db_batch_size = settings.db_batch_size
         self.max_workers = settings.max_workers
         self.retry_attempts = settings.retry_attempts
         self.retry_delay = settings.retry_delay

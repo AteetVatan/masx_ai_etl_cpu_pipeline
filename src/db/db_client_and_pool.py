@@ -352,7 +352,7 @@ class DatabaseClientAndPool:
 
         try:
             # Process updates in batches to avoid overwhelming the database
-            batch_size = self.settings.batch_size
+            batch_size = self.settings.db_batch_size
             total_batches = (len(updates) + batch_size - 1) // batch_size
 
             for batch_idx in range(total_batches):
