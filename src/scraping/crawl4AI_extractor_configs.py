@@ -18,6 +18,7 @@ from crawl4ai import CrawlerRunConfig, CacheMode, BrowserConfig, ProxyConfig
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 from crawl4ai.content_filter_strategy import PruningContentFilter
 from .simple_proxy_rotator import SimpleProxyRotator
+from src.config import get_settings
 
 
 class Crawl4AIExtractorConfigs:
@@ -106,6 +107,7 @@ class Crawl4AIExtractorConfigs:
         #     threshold=0.4,
         #     min_word_threshold=60,   # a bit higher to drop boilerplate
         # )
+        settings = get_settings()
         rotator = None
         if proxies:
             rotator = SimpleProxyRotator(proxies)
@@ -215,6 +217,7 @@ class Crawl4AIExtractorConfigs:
         }"""
 
         common_kwargs = dict(
+            log_console=settings.debug,
             markdown_generator=md_generator,
             wait_for=generic_ready,
             # wait_for_images=True,

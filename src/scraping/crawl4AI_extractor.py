@@ -146,58 +146,58 @@ class Crawl4AIExtractor:
         self,
         url: str,
         proxies: list[str] = None,
-        retries: int = 2,
+        retries: int = 3,
         timeout_sec: int = 60000,  # maximum 1 minute
     ) -> ExtractResult:
         from src.scraping import WebScraperUtils
         proxies = await self.proxy_service.validate_proxies(proxies)
-        browser_configs = c4a_configs.get_browser_presets()
+        #browser_configs = c4a_configs.get_browser_presets()
         config = c4a_configs.get_crawl4ai_config(proxies)
         
-        for browser_cfg in browser_configs:            
-            for attempt in range(1, retries + 1):
-                try:
-                    async with AsyncWebCrawler() as crawler:
-                        result = await crawler.arun(
-                            url=url,
-                            config=config,
-                            browser_config=browser_cfg,
-                            timeout=timeout_sec,
-                        )
-                    if not result:
-                        raise RuntimeError("Crawler returned no result")
-
-                    if not result.success:
-                        raise RuntimeError(
-                            f"Crawl failed with error: {result.error_message or 'unknown error'}"
-                        )
-
-                    scrap_result: ExtractResult = await self.trafilatura_from_html(
-                        result.cleaned_html, url
+            
+        for attempt in range(1, retries + 1):
+            try:
+                async with AsyncWebCrawler() as crawler:
+                    result = await crawler.arun(
+                        url=url,
+                        config=config,
+                        browser_config=c4a_configs.get_crawl4ai_browser_config(),
+                        timeout=timeout_sec,
                     )
-                    # images = WebScraperUtils.extract_image_urls(scrap_result.content)
-                    # scrap_result.images = images
-                    if WebScraperUtils.find_error_pattern(scrap_result.content):
-                        scrap_result.content = "error_pattern_found"
-                    cleaned = WebScraperUtils.remove_ui_junk(scrap_result.content)
+                if not result:
+                    raise RuntimeError("Crawler returned no result")
 
-                    scrap_result.content = cleaned
-                    word_count = len(cleaned.split())
-                    scrap_result.word_count = word_count
-                    return scrap_result
-
-                except TimeoutError:
-                    self.logger.warning(
-                        f"crawl4AI_extractor.py:Crawl4AIExtractor:Attempt {attempt} timed out after {timeout_sec}s"
-                    )
-                except Exception as e:
-                    self.logger.error(
-                        f"crawl4AI_extractor.py:Crawl4AIExtractor:Attempt {attempt} failed : {e}"
+                if not result.success:
+                    raise RuntimeError(
+                        f"Crawl failed with error: {result.error_message or 'unknown error'}"
                     )
 
-            # # after last attempt
-            # if attempt < retries:
-            #     await asyncio.sleep(2**attempt)  # exponential back-off
+                scrap_result: ExtractResult = await self.trafilatura_from_html(
+                    result.cleaned_html, url
+                )
+                # images = WebScraperUtils.extract_image_urls(scrap_result.content)
+                # scrap_result.images = images
+                if WebScraperUtils.find_error_pattern(scrap_result.content):
+                    scrap_result.content = "error_pattern_found"
+                cleaned = WebScraperUtils.remove_ui_junk(scrap_result.content)
+
+                scrap_result.content = cleaned
+                word_count = len(cleaned.split())
+                scrap_result.word_count = word_count
+                return scrap_result
+
+            except TimeoutError:
+                self.logger.warning(
+                    f"crawl4AI_extractor.py:Crawl4AIExtractor:Attempt {attempt} timed out after {timeout_sec}s"
+                )
+            except Exception as e:
+                self.logger.error(
+                    f"crawl4AI_extractor.py:Crawl4AIExtractor:Attempt {attempt} failed : {e}"
+                )
+
+        # after last attempt
+        if attempt < retries:
+            await asyncio.sleep(2**(attempt-1))  # exponential back-off
 
         self.logger.error(
             f"crawl4AI_extractor.py:Crawl4AIExtractor:All {retries} crawl attempts failed"
