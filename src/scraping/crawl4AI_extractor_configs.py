@@ -53,7 +53,7 @@ class Crawl4AIExtractorConfigs:
         return browser_cfg
 
     @staticmethod
-    def get_browser_presets(proxy: Optional[ProxyConfig] = None) -> List[BrowserConfig]:
+    def get_browser_presets() -> List[BrowserConfig]:
         """
         Returns a prioritized list of BrowserConfig objects for resilient crawling.
         1. Undetected + stealth (best for Google)
@@ -75,14 +75,12 @@ class Crawl4AIExtractorConfigs:
                 headless=True,
                 enable_stealth=True,
                 ignore_https_errors=True,
-                proxy_config=proxy,
                 extra_args=base_args,
             ),
             BrowserConfig(
                 browser_type="firefox",
                 headless=True,
                 ignore_https_errors=True,
-                proxy_config=proxy,
                 extra_args=["--no-sandbox", "--disable-dev-shm-usage"],
             ),
             BrowserConfig(
@@ -90,7 +88,6 @@ class Crawl4AIExtractorConfigs:
                 headless=True,
                 enable_stealth=True,
                 ignore_https_errors=True,
-                proxy_config=proxy,
                 extra_args=base_args,
             ),
         ]
@@ -224,7 +221,7 @@ class Crawl4AIExtractorConfigs:
             # adjust_viewport_to_content=True,
             # wait_for='js:() => !!document.querySelector("main, article, [role=\'main\'], .article, .article-body")',
             delay_before_return_html=2.5,  # <-- the “works in debug” delay, but explicit
-            page_timeout=60000,  # ms — give slow SPAs time to settle
+            page_timeout=100000,  # ms — give slow SPAs time to settle
             scan_full_page=True,  # crawl beyond just the viewport
             # 1) Remove whole tags up front (kills inline JSON, scripts, styles)
             excluded_tags=["script", "style", "noscript"],

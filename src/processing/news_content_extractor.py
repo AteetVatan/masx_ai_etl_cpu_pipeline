@@ -57,7 +57,8 @@ class NewsContentExtractor:
             )
             # proxies = await ProxyManager.proxies_async()
 
-            proxies = await self.proxy_service.get_proxy_cache()
+            proxies = await self.proxy_service.get_proxy_cache(force_refresh=True)
+            proxies = await self.proxy_service.validate_proxies(proxies)
 
             self.logger.info(
                 f"news_content_extractor.py:NewsContentExtractor:---- {len(proxies)} proxies found ----"
@@ -127,23 +128,26 @@ class NewsContentExtractor:
                 # first try quick crawl4ai scrape
                 try:
                     crawl_result: ExtractResult = await self.crawl4AIExtractor.crawl4ai_scrape(url)
+                    crawl_result = None
                 except Exception as e:
                     self.logger.error(f"NewsContentExtractor:Normal Crawl4AI scraping failed for {url[:50]}...: {e}")
                     
                 # if not successful, try with proxy and retry with longer timeout
-                if not crawl_result:
+                if not crawl_result and len(proxies) > 0:
                     proxy = choice(proxies)
                     crawl_result: ExtractResult = (
-                        await self.crawl4AIExtractor.crawl4ai_scrape_with_retry_and_proxy(
-                            url, proxies
-                        )
+                        await self.crawl4AIExtractor.crawl4ai_scrape_with_retry_and_proxy(url, proxies)
                     )
-                    if not crawl_result:  # sanity check
-                        raise ValueError("Crawl4AI returned empty or too short content.")
+                    if crawl_result and crawl_result.word_count < 2000:
+                        crawl_result = None
+                        
+                        
+                if not crawl_result:  # sanity check
+                    raise ValueError("Crawl4AI returned empty or too short content.")
 
-                    self.logger.info(
-                        f"news_content_extractor.py:NewsContentExtractor:Successfully scraped via Crawl4AI: {url[:50]}..."
-                    )
+                self.logger.info(
+                    f"news_content_extractor.py:NewsContentExtractor:Successfully scraped via Crawl4AI: {url[:50]}..."
+                )
 
                 # if traf_result is not None, then merge traf_result and crawl_result
                 final_result = self._merge_results(traf_result, crawl_result)

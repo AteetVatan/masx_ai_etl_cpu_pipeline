@@ -124,12 +124,32 @@ class ProxyService:
         self.logger.info(f"ProxyService initialized with base URL: {self.base_url}")
         self._initialized = True
 
-    async def get_proxy_cache(self) -> List[str]:
+    async def get_proxy_cache(self, force_refresh: bool = False) -> List[str]:
         """Get the proxy cache, refreshing if expired."""
-        if not self._proxy_cache:
+        if not self._proxy_cache or force_refresh:
             self._proxy_cache = await self.__get_proxies()
 
-        return self._proxy_cache
+        return self._proxy_cache   
+
+
+     
+    
+    async def validate_proxies(self, proxies: List[str]) -> List[str]:
+        """Validate the proxies from the proxy service."""
+        import requests
+        proxies = await self.get_proxy_cache()
+        valid_proxies = []
+        for proxy in proxies:
+            try:
+                r = requests.get("https://httpbin.org/ip", proxies={"http": f"http://{proxy}", "https": f"http://{proxy}"}, timeout=5)
+                if r.status_code == 200:
+                    valid_proxies.append(proxy)
+            except Exception as e:
+                #print(proxy, "FAILED:", e)
+                pass
+        self.logger.info(f"Validated {len(valid_proxies)} proxies out of {len(proxies)}")
+        return valid_proxies
+    
 
     async def _refresh(self):
         """Internal refresh method (safe)."""
