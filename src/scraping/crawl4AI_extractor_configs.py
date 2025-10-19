@@ -109,7 +109,7 @@ class Crawl4AIExtractorConfigs:
         #     threshold=0.4,
         #     min_word_threshold=60,   # a bit higher to drop boilerplate
         # )
-
+        rotator = None
         if proxies:
             rotator = SimpleProxyRotator(proxies)
 
@@ -217,8 +217,7 @@ class Crawl4AIExtractorConfigs:
         return contentful && stable;
         }"""
 
-        config = CrawlerRunConfig(
-            proxy_rotation_strategy=rotator,
+        common_kwargs = dict(
             markdown_generator=md_generator,
             wait_for=generic_ready,
             # wait_for_images=True,
@@ -244,6 +243,10 @@ class Crawl4AIExtractorConfigs:
             # 5) Stable, reproducible runs
             cache_mode=CacheMode.BYPASS,  # or SMART if you want caching
         )
+        if rotator:
+            config = CrawlerRunConfig(proxy_rotation_strategy=rotator, **common_kwargs)
+        else:
+            config = CrawlerRunConfig(**common_kwargs)
         return config
 
     @staticmethod

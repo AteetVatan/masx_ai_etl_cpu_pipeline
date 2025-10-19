@@ -123,19 +123,27 @@ class NewsContentExtractor:
             self.logger.info(
                 f"NewsContentExtractor:[Fallback] Invoking Crawl4AI for: {url[:50]}..."
             )
-            try:
-                proxy = choice(proxies)
-                crawl_result: ExtractResult = (
-                    await self.crawl4AIExtractor.crawl4ai_scrape_with_retry(
-                        url, proxies
+            try:                
+                # first try quick crawl4ai scrape
+                try:
+                    crawl_result: ExtractResult = await self.crawl4AIExtractor.crawl4ai_scrape(url)
+                except Exception as e:
+                    self.logger.error(f"NewsContentExtractor:Normal Crawl4AI scraping failed for {url[:50]}...: {e}")
+                    
+                # if not successful, try with proxy and retry with longer timeout
+                if not crawl_result:
+                    proxy = choice(proxies)
+                    crawl_result: ExtractResult = (
+                        await self.crawl4AIExtractor.crawl4ai_scrape_with_retry_and_proxy(
+                            url, proxies
+                        )
                     )
-                )
-                if not crawl_result:  # sanity check
-                    raise ValueError("Crawl4AI returned empty or too short content.")
+                    if not crawl_result:  # sanity check
+                        raise ValueError("Crawl4AI returned empty or too short content.")
 
-                self.logger.info(
-                    f"news_content_extractor.py:NewsContentExtractor:Successfully scraped via Crawl4AI: {url[:50]}..."
-                )
+                    self.logger.info(
+                        f"news_content_extractor.py:NewsContentExtractor:Successfully scraped via Crawl4AI: {url[:50]}..."
+                    )
 
                 # if traf_result is not None, then merge traf_result and crawl_result
                 final_result = self._merge_results(traf_result, crawl_result)
