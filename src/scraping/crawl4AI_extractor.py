@@ -31,6 +31,7 @@ from src.models import ExtractResult
 from src.config import get_service_logger
 from .crawl4AI_extractor_configs import Crawl4AIExtractorConfigs as c4a_configs
 
+
 class Crawl4AIExtractor:
     """
     This class contains the Crawl4AIExtractor class, which is a class that extracts content from a URL using the Crawl4AI API.
@@ -40,18 +41,23 @@ class Crawl4AIExtractor:
         self.logger = get_service_logger("Crawl4AIExtractor")
         self.proxy = proxy
 
-
-    async def _try_once(self, url: str, browser_cfg: BrowserConfig, run_cfg: CrawlerRunConfig, timeout_sec: int):        
-        async with AsyncWebCrawler() as crawler:
-            return await crawler.arun(url=url,browser_config=browser_cfg, config=run_cfg, timeout=timeout_sec)
-
-    async def crawl4ai_scrape(
-        self, url: str, timeout_sec: int = 3600
+    async def _try_once(
+        self,
+        url: str,
+        browser_cfg: BrowserConfig,
+        run_cfg: CrawlerRunConfig,
+        timeout_sec: int,
     ):
+        async with AsyncWebCrawler() as crawler:
+            return await crawler.arun(
+                url=url, browser_config=browser_cfg, config=run_cfg, timeout=timeout_sec
+            )
+
+    async def crawl4ai_scrape(self, url: str, timeout_sec: int = 3600):
         from src.scraping import WebScraperUtils  # your existing utility
 
-        #is_gnews = c4a_configs.is_google_news_url(url)
-        #run_cfg = c4a_configs.get_run_config(is_gnews)
+        # is_gnews = c4a_configs.is_google_news_url(url)
+        # run_cfg = c4a_configs.get_run_config(is_gnews)
         run_cfg = c4a_configs.get_crawl4ai_config()
         browsers = c4a_configs.get_browser_presets()
 
@@ -60,36 +66,48 @@ class Crawl4AIExtractor:
         for browser_cfg in browsers:
             try:
                 browser_config_index += 1
-                result = await self._try_once(url, browser_cfg, run_cfg, timeout_sec)               
+                result = await self._try_once(url, browser_cfg, run_cfg, timeout_sec)
                 if not result or not result.success:
                     raise RuntimeError(result.error_message or "unknown error")
 
-                scrap_result = await self.trafilatura_from_html(result.cleaned_html, url)
+                scrap_result = await self.trafilatura_from_html(
+                    result.cleaned_html, url
+                )
                 cleaned = WebScraperUtils.remove_ui_junk(scrap_result.content)
-                scrap_result.content = "error_pattern_found" if WebScraperUtils.find_error_pattern(cleaned) else cleaned
+                scrap_result.content = (
+                    "error_pattern_found"
+                    if WebScraperUtils.find_error_pattern(cleaned)
+                    else cleaned
+                )
                 scrap_result.word_count = len(scrap_result.content.split())
                 return scrap_result
 
             except Exception as e:
-                self.logger.error(f"[C4AI] Error for browser config {browser_config_index}: {e}")
+                self.logger.error(
+                    f"[C4AI] Error for browser config {browser_config_index}: {e}"
+                )
                 last_err = e
-                #await asyncio.sleep(1.5)
+                # await asyncio.sleep(1.5)
 
         self.logger.error(f"[C4AI] All attempts failed for {url[:50]}...: {last_err}")
         return None
 
-
-    
-
     async def crawl4ai_scrape_old(
-        self, url: str, timeout_sec: int = 3600,  # maximum 1 minute
+        self,
+        url: str,
+        timeout_sec: int = 3600,  # maximum 1 minute
     ) -> ExtractResult:
         try:
             from src.scraping import WebScraperUtils
 
             config = c4a_configs.get_crawl4ai_config()
             async with AsyncWebCrawler() as crawler:
-                result = await crawler.arun(url=url, config=config, browser_config=c4a_configs.get_crawl4ai_browser_config(), timeout=timeout_sec)
+                result = await crawler.arun(
+                    url=url,
+                    config=config,
+                    browser_config=c4a_configs.get_crawl4ai_browser_config(),
+                    timeout=timeout_sec,
+                )
             if not result:
                 raise RuntimeError("Crawler returned no result")
 
@@ -138,7 +156,7 @@ class Crawl4AIExtractor:
         # import requests
         # valid_proxies = []
         # #
-        
+
         # for proxy in proxies:
         #     try:
         #         r = requests.get("https://httpbin.org/ip", proxies={"http": f"http://{proxy}", "https": f"http://{proxy}"}, timeout=5)
@@ -147,14 +165,13 @@ class Crawl4AIExtractor:
         #     except Exception as e:
         #         print(proxy, "FAILED:", e)
 
-        
         for attempt in range(1, max_retries + 1):
             try:
                 config = c4a_configs.get_crawl4ai_config(proxies)
                 async with AsyncWebCrawler() as crawler:
                     result = await crawler.arun(
                         url=url,
-                        config=config, 
+                        config=config,
                         browser_config=c4a_configs.get_crawl4ai_browser_config(),
                         timeout=timeout_sec,
                     )
@@ -164,7 +181,7 @@ class Crawl4AIExtractor:
                 if not result.success:
                     raise RuntimeError(
                         f"Crawl failed with error: {result.error_message or 'unknown error'}"
-                    )  
+                    )
 
                 scrap_result: ExtractResult = await self.trafilatura_from_html(
                     result.cleaned_html, url

@@ -43,16 +43,16 @@ async def initialize_services():
     """Initialize database and pipeline services."""
     from src.db import db_connection
     from src.pipeline import pipeline_manager
-    
+
     try:
         # Initialize database connection
         await db_connection.connect()
         print("Database connection established")
-        
+
         # Initialize pipeline manager
         await pipeline_manager.health_check()
         print("Pipeline manager initialized")
-        
+
     except Exception as e:
         print(f"Failed to initialize services: {e}")
         raise
@@ -66,20 +66,17 @@ def main():
     try:
         # Initialize services in async context
         asyncio.run(initialize_services())
-        
+
         # Import and run Flask app
         from src.api_flask.server_flask import app
-        
+
         logger.info("Starting MASX AI ETL CPU Pipeline Flask server...")
-        
+
         # Run Flask app
         app.run(
-            host=settings.host,
-            port=settings.port,
-            debug=settings.debug,
-            threaded=True
+            host=settings.host, port=settings.port, debug=settings.debug, threaded=True
         )
-        
+
     except KeyboardInterrupt:
         print("\nServer stopped by user")
         sys.exit(0)

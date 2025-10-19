@@ -1,6 +1,7 @@
 from typing import List
 from pydantic import BaseModel
 
+
 class EntityAttributes(BaseModel):
     """
     Represents a single extracted entity with its confidence score.
@@ -9,6 +10,7 @@ class EntityAttributes(BaseModel):
         text (str): The actual text span recognized as an entity.
         score (float): Model-assigned confidence score (0.0–1.0) for this entity.
     """
+
     text: str
     score: float
 
@@ -23,6 +25,7 @@ class MetaAttributes(BaseModel):
         model (str): Identifier of the NER model used for extraction.
         chunks (int): Number of text chunks the document was split into before processing.
     """
+
     chars: int
     score: float
     model: str
@@ -59,6 +62,7 @@ class EntityModel(BaseModel):
         QUANTITY (List[EntityAttributes]): List of detected quantities and measurements.
         meta (MetaAttributes): Metadata about the extraction process.
     """
+
     PERSON: List[EntityAttributes]
     ORG: List[EntityAttributes]
     GPE: List[EntityAttributes]

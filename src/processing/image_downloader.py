@@ -275,7 +275,7 @@ class ImageDownloader:
                 served_url = self._serve_url(stored_path)
                 return (url, stored_path, served_url)
             except Exception as e:
-                #logger.error(f"Failed processing image {url}: {e}", exc_info=False)
+                # logger.error(f"Failed processing image {url}: {e}", exc_info=False)
                 return (url, None, None)
 
     async def _download_bytes(

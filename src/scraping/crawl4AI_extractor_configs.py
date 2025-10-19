@@ -20,8 +20,6 @@ from crawl4ai.content_filter_strategy import PruningContentFilter
 from .simple_proxy_rotator import SimpleProxyRotator
 
 
-
-
 class Crawl4AIExtractorConfigs:
     # ------------------------------------------------------------------------------
     # DOMAIN DETECTOR
@@ -34,13 +32,10 @@ class Crawl4AIExtractorConfigs:
         except Exception:
             return False
 
-
     # ------------------------------------------------------------------------------
     # BROWSER CONFIG PRESETS
     # ------------------------------------------------------------------------------
-    
-       
-    
+
     @staticmethod
     def get_crawl4ai_browser_config():
         browser_cfg = BrowserConfig(
@@ -56,8 +51,7 @@ class Crawl4AIExtractorConfigs:
             enable_stealth=True,  # helps bypass bot detection
         )
         return browser_cfg
-    
-    
+
     @staticmethod
     def get_browser_presets(proxy: Optional[ProxyConfig] = None) -> List[BrowserConfig]:
         """
@@ -102,13 +96,11 @@ class Crawl4AIExtractorConfigs:
         ]
         return configs
 
-
     # ------------------------------------------------------------------------------
     # RUN CONFIG PRESETS
     # ------------------------------------------------------------------------------
     @staticmethod
     def get_crawl4ai_config(proxies: list[str] = None):
-  
         """
         Get the Crawl4AI configuration.
         """
@@ -117,12 +109,10 @@ class Crawl4AIExtractorConfigs:
         #     threshold=0.4,
         #     min_word_threshold=60,   # a bit higher to drop boilerplate
         # )
-        
+
         if proxies:
             rotator = SimpleProxyRotator(proxies)
-       
 
-       
         prune_filter = PruningContentFilter(
             threshold=0.20,  # Lower value retains more text
             threshold_type="fixed",  # Try switching from "dynamic" to "fixed"
@@ -255,20 +245,19 @@ class Crawl4AIExtractorConfigs:
             cache_mode=CacheMode.BYPASS,  # or SMART if you want caching
         )
         return config
-    
-    
-    
-    
-    
-    
+
     @staticmethod
     def get_run_config(is_gnews: bool) -> CrawlerRunConfig:
         """Returns a tuned CrawlerRunConfig for either normal or Google redirect pages."""
 
         def _markdown_pruner():
-            prune_filter = PruningContentFilter(threshold=0.20, threshold_type="fixed", min_word_threshold=25)
-            return DefaultMarkdownGenerator(content_filter=prune_filter, options={"ignore_links": True, "escape_html": True})
-        
+            prune_filter = PruningContentFilter(
+                threshold=0.20, threshold_type="fixed", min_word_threshold=25
+            )
+            return DefaultMarkdownGenerator(
+                content_filter=prune_filter,
+                options={"ignore_links": True, "escape_html": True},
+            )
 
         if is_gnews and False:
             # Fast-fail config for redirect-heavy pages
@@ -282,7 +271,7 @@ class Crawl4AIExtractorConfigs:
                 excluded_selector="header, footer, nav, aside, .cookie-banner, .consent-banner",
                 word_count_threshold=50,
             )
-            
+
         return Crawl4AIExtractorConfigs.get_crawl4ai_config()
 
         # Default config for real articles
@@ -296,5 +285,3 @@ class Crawl4AIExtractorConfigs:
             excluded_selector="header, footer, nav, aside, .cookie-banner, .consent-banner",
             word_count_threshold=50,
         )
-
-

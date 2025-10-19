@@ -316,15 +316,15 @@ class PipelineManager:
             Optimal batch size for processing
         """
         # Base batch size on available CPU cores and thread pool capacity
-        
+
         return self.max_workers
-        
+
         cpu_cores = os.cpu_count() or 4
         max_workers = self.max_workers
 
         # Calculate base batch size (2-3x the number of workers for good throughput)
         base_batch_size = max_workers * 2
-        
+
         batch_size = 6
 
         # Adjust based on total articles
@@ -337,11 +337,9 @@ class PipelineManager:
         else:
             # For large workloads, use larger batches but cap at reasonable size
             batch_size = min(base_batch_size * 3, 100)
-        
+
         logger.info(f"Calculated optimal batch size: {batch_size}")
         return batch_size
-        
-        
 
     def _create_sub_batches(
         self, article_data_list: List[FeedModel], batch_size: int

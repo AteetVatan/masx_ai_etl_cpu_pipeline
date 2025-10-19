@@ -6,9 +6,10 @@ from .geo_entity import GeoEntity
 
 class ExtractResult(BaseModel):
     """Normalized result for downstream pipeline."""
-    id: str = ""    
+
+    id: str = ""
     parent_id: Optional[str] = ""
-    url: str=""
+    url: str = ""
     title: Optional[str] = ""
     title_en: Optional[str] = ""
     language: Optional[str] = ""

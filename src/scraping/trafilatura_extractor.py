@@ -97,9 +97,8 @@ class TrafilaturaExtractor:
         # if proxy:
         #     os.environ["http_proxy"] = f"http://{proxy}"
         #     os.environ["https_proxy"] = f"https://{proxy}"
-        
-        
-        #trafilatura.downloads.PROXY_URL = f"http://{proxy}"
+
+        # trafilatura.downloads.PROXY_URL = f"http://{proxy}"
 
         for attempt in range(1 + self.max_retries):
             try:
@@ -119,7 +118,9 @@ class TrafilaturaExtractor:
                 result: ExtractResult = await self.trafilatura_from_html(
                     downloaded, url
                 )
-                logger.info(f"[trafilatura] success: {url[:50]}... (words={result.word_count})")
+                logger.info(
+                    f"[trafilatura] success: {url[:50]}... (words={result.word_count})"
+                )
                 return result
 
             except (asyncio.TimeoutError, ScrapingError) as e:

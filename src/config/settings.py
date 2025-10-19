@@ -19,9 +19,10 @@ class Settings(BaseSettings):
     # supabase_anon_key: str = Field(..., description="Supabase anon key")
     # supabase_service_role_key: str = Field(..., description="Supabase service key")
 
-    
-    process_articles_limit: int = Field(default=0, description="Number of articles to process")
-        # Pipeline Configuration
+    process_articles_limit: int = Field(
+        default=0, description="Number of articles to process"
+    )
+    # Pipeline Configuration
     max_workers: int = Field(
         default_factory=lambda: min(32, (os.cpu_count() or 1) * 2),
         description="Maximum number of worker threads",
@@ -56,7 +57,6 @@ class Settings(BaseSettings):
     database_min_connections: int = Field(
         default=1, description="Minimum number of database connections"
     )
-
 
     request_timeout: int = Field(default=30, description="Request timeout in seconds")
     retry_attempts: int = Field(default=3, description="Number of retry attempts")

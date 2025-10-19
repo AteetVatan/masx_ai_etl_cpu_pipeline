@@ -45,41 +45,45 @@ def get_async_loop():
 
 def async_route(f):
     """Decorator to handle async functions in Flask routes."""
+
     @wraps(f)
     def wrapper(*args, **kwargs):
         loop = get_async_loop()
         return loop.run_until_complete(f(*args, **kwargs))
+
     return wrapper
 
 
 def verify_api_key():
     """
     Verify API key from request headers.
-    
+
     Returns:
         bool: True if API key is valid
-        
+
     Raises:
         Exception: If API key is missing or invalid
     """
     # Skip verification if not required
     if not settings.require_api_key:
         return True
-    
+
     # Get API key from headers
     api_key = request.headers.get("X-API-Key") or request.headers.get("Authorization")
-    
+
     if not api_key:
-        raise Exception("API key required. Please provide X-API-Key or Authorization header")
-    
+        raise Exception(
+            "API key required. Please provide X-API-Key or Authorization header"
+        )
+
     # Remove 'Bearer ' prefix if present
     if api_key.startswith("Bearer "):
         api_key = api_key[7:]
-    
+
     # Verify against configured API key
     if api_key != settings.api_key:
         raise Exception("Invalid API key")
-    
+
     return True
 
 
@@ -88,6 +92,7 @@ def get_pipeline_manager():
     global _pipeline_manager
     if _pipeline_manager is None:
         from src.pipeline import pipeline_manager
+
         _pipeline_manager = pipeline_manager
     return _pipeline_manager
 
@@ -97,12 +102,14 @@ def get_feed_processor():
     global _feed_processor
     if _feed_processor is None:
         from src.processing import feed_processor
+
         _feed_processor = feed_processor
     return _feed_processor
 
 
 def run_background_task(func, *args, **kwargs):
     """Run a function in a background thread."""
+
     def background_worker():
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
@@ -110,7 +117,7 @@ def run_background_task(func, *args, **kwargs):
             loop.run_until_complete(func(*args, **kwargs))
         finally:
             loop.close()
-    
+
     thread = threading.Thread(target=background_worker, daemon=True)
     thread.start()
     return thread
@@ -161,18 +168,21 @@ def before_request():
 
 # API Endpoints
 
+
 @app.route("/", methods=["GET"])
 def root():
     """Root endpoint with API information."""
-    return jsonify({
-        "message": "MASX AI ETL CPU Pipeline API - Flask",
-        "version": "1.0.0",
-        "endpoints": {
-            "feed_process": "/feed/process",
-            "feed_process_flashpoint": "/feed/process/flashpoint"
-        },
-        "status": "operational",
-    })
+    return jsonify(
+        {
+            "message": "MASX AI ETL CPU Pipeline API - Flask",
+            "version": "1.0.0",
+            "endpoints": {
+                "feed_process": "/feed/process",
+                "feed_process_flashpoint": "/feed/process/flashpoint",
+            },
+            "status": "operational",
+        }
+    )
 
 
 @app.route("/health", methods=["GET"])
@@ -180,7 +190,7 @@ def root():
 async def health_check():
     """
     Comprehensive health check endpoint.
-    
+
     Returns the health status of all system components including
     database, thread pool, and processing modules.
     """
@@ -198,7 +208,7 @@ async def health_check():
 async def get_stats():
     """
     Get comprehensive pipeline statistics.
-    
+
     Returns detailed statistics about processing performance,
     thread pool usage, and database operations.
     """
@@ -216,11 +226,11 @@ async def get_stats():
 async def process_feed_entries():
     """
     Process all feed entries for a specific date.
-    
+
     This endpoint processes all feed entries from the feed_entries_{date} table
     through the complete pipeline: scrape → clean → geotag → find image → save to DB.
     If no date is provided, uses today's date.
-    
+
     Request body:
     {
         "date": "2024-01-01",  # Optional, defaults to today
@@ -234,39 +244,43 @@ async def process_feed_entries():
         date = data.get("date")
         flashpoints = data.get("flashpoints")
         trigger = data.get("trigger")
-        
+
         feed_processor = get_feed_processor()
-        
+
         # Use today's date if not provided
         date = date or get_today_date()
-        
+
         # Validate date format
         try:
             validated_date = validate_and_raise(date, "date")
         except ValueError as e:
             return jsonify({"detail": str(e)}), 400
-        
+
         # Process feed entries
         feed_processor.set_date(validated_date)
-        
+
         # Fire-and-forget mode for MASX AI trigger
         if trigger == "masxai":
-            run_background_task(feed_processor.process_all_feed_entries, batch_mode=True)
+            run_background_task(
+                feed_processor.process_all_feed_entries, batch_mode=True
+            )
             logger.info(f"MASX AI background job started for {validated_date}")
-            return jsonify({
-                "status": "started",
-                "message": f"MASX AI background processing initiated for {validated_date}",
-                "date": validated_date,
-                "total_entries": 0,
-                "successful": 0,
-                "failed": 0,
-                "processing_time": 0,
-                "timestamp": datetime.utcnow().isoformat(),
-            })
-        
+            return jsonify(
+                {
+                    "status": "started",
+                    "message": f"MASX AI background processing initiated for {validated_date}",
+                    "date": validated_date,
+                    "total_entries": 0,
+                    "successful": 0,
+                    "failed": 0,
+                    "processing_time": 0,
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
+            )
+
         result = await feed_processor.process_all_feed_entries(batch_mode=True)
         return jsonify(result)
-        
+
     except DatabaseError as e:
         logger.error(f"Database error during processing: {e}")
         return jsonify({"detail": f"Table feed_entries_{date} not available"}), 404
@@ -280,11 +294,11 @@ async def process_feed_entries():
 async def process_feed_entries_by_flashpoint():
     """
     Process feed entries for a specific date and flashpoint ID.
-    
+
     This endpoint processes feed entries from the feed_entries_{date} table
     filtered by flashpoint_id through the complete pipeline.
     If no date is provided, uses today's date.
-    
+
     Request body:
     {
         "date": "2024-01-01",  # Optional, defaults to today
@@ -298,44 +312,52 @@ async def process_feed_entries_by_flashpoint():
         date = data.get("date")
         flashpoint_id = data.get("flashpoint_id")
         trigger = data.get("trigger")
-        
+
         feed_processor = get_feed_processor()
-        
+
         # Use today's date if not provided
         date = date or get_today_date()
-        
+
         # Validate date format
         try:
             validated_date = validate_and_raise(date, "date")
         except ValueError as e:
             return jsonify({"detail": str(e)}), 400
-        
+
         # Validate flashpoint_id
         if not flashpoint_id:
             return jsonify({"detail": "flashpoint_id is required"}), 400
-        
+
         # Process feed entries by flashpoint ID
         feed_processor.set_date(validated_date)
-        
+
         # Fire-and-forget mode for MASX AI trigger
         if trigger == "masxai":
-            run_background_task(feed_processor.process_feed_entries_by_flashpoint_id, flashpoint_id)
-            logger.info(f"MASX AI background job started for {validated_date} and flashpoint_id {flashpoint_id}")
-            return jsonify({
-                "status": "started",
-                "message": f"MASX AI background processing initiated for {validated_date} and flashpoint_id {flashpoint_id}",
-                "date": validated_date,
-                "flashpoint_id": flashpoint_id,
-                "total_entries": 0,
-                "successful": 0,
-                "failed": 0,
-                "processing_time": 0,
-                "timestamp": datetime.utcnow().isoformat(),
-            })
-        
-        result = await feed_processor.process_feed_entries_by_flashpoint_id(flashpoint_id)
+            run_background_task(
+                feed_processor.process_feed_entries_by_flashpoint_id, flashpoint_id
+            )
+            logger.info(
+                f"MASX AI background job started for {validated_date} and flashpoint_id {flashpoint_id}"
+            )
+            return jsonify(
+                {
+                    "status": "started",
+                    "message": f"MASX AI background processing initiated for {validated_date} and flashpoint_id {flashpoint_id}",
+                    "date": validated_date,
+                    "flashpoint_id": flashpoint_id,
+                    "total_entries": 0,
+                    "successful": 0,
+                    "failed": 0,
+                    "processing_time": 0,
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
+            )
+
+        result = await feed_processor.process_feed_entries_by_flashpoint_id(
+            flashpoint_id
+        )
         return jsonify(result)
-        
+
     except DatabaseError as e:
         logger.error(f"Database error during processing: {e}")
         return jsonify({"detail": f"Table feed_entries_{date} not available"}), 404

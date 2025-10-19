@@ -8,7 +8,7 @@ class FeedModel(BaseModel):
     id: str
     url: str
     title: str
-    title_en: Optional[str] = None #new
+    title_en: Optional[str] = None  # new
     content: Optional[str] = ""
     author: Optional[str] = ""
     published_date: Optional[str] = None
@@ -17,11 +17,10 @@ class FeedModel(BaseModel):
     language: Optional[str] = None
     source_country: Optional[str] = None
     original_image: Optional[str] = None
-    images: Optional[List[str]] = None #new
-    hostname: Optional[str] = None #new
-    entities: Optional[EntityModel] = None #new #jsonb
-    geo_entities: Optional[List[GeoEntity]] = None #new #jsonb
-
+    images: Optional[List[str]] = None  # new
+    hostname: Optional[str] = None  # new
+    entities: Optional[EntityModel] = None  # new #jsonb
+    geo_entities: Optional[List[GeoEntity]] = None  # new #jsonb
 
     @classmethod
     def from_feed_entry(cls, feed_entry: Dict[str, Any]) -> "FeedModel":

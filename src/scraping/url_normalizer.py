@@ -18,19 +18,22 @@ SAFE_SCHEMES = {"http", "https"}
 # Match Google News RSS redirector pattern
 _GOOGLE_NEWS_RE = re.compile(r"^https?://news\.google\.com/rss/articles/", re.I)
 
+
 def _is_safe_url(url: str) -> bool:
     try:
         p = urlparse(url)
         return p.scheme in SAFE_SCHEMES and bool(p.netloc)
     except Exception:
         return False
-    
+
+
 def extract_continue_from_consent(url: str) -> str:
     parsed = urlparse(url)
     qs = parse_qs(parsed.query)
     if "continue" in qs:
         return unquote(qs["continue"][0])
     return url
+
 
 def resolve_redirects(url: str, timeout: float = 6.0, max_hops: int = 5) -> str:
     """
@@ -45,7 +48,7 @@ def resolve_redirects(url: str, timeout: float = 6.0, max_hops: int = 5) -> str:
     try:
         # HEAD is faster but not all servers allow it; fall back to GET.
         resp = session.head(url, allow_redirects=True, timeout=timeout)
-        
+
         continue_url = extract_continue_from_consent(resp.url)
         final = continue_url
         if final == url or not _is_safe_url(final):
@@ -54,8 +57,7 @@ def resolve_redirects(url: str, timeout: float = 6.0, max_hops: int = 5) -> str:
         return final if _is_safe_url(final) else url
     except Exception as e:
         return url
-    
-    
+
 
 def normalize_google_news(url: str) -> str:
     """
@@ -65,6 +67,7 @@ def normalize_google_news(url: str) -> str:
     if _GOOGLE_NEWS_RE.match(url):
         return resolve_redirects(url)
     return url
+
 
 def normalize_url(url: str) -> str:
     """
