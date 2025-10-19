@@ -146,14 +146,16 @@ class Crawl4AIExtractor:
         self,
         url: str,
         proxies: list[str] = None,
-        max_retries: int = 1,
+        retries: int = 2,
         timeout_sec: int = 60000,  # maximum 1 minute
     ) -> ExtractResult:
         from src.scraping import WebScraperUtils
+        proxies = await self.proxy_service.validate_proxies(proxies)
         browser_configs = c4a_configs.get_browser_presets()
         config = c4a_configs.get_crawl4ai_config(proxies)
-        for attempt in range(1, max_retries + 1):
-            for browser_cfg in browser_configs:            
+        
+        for browser_cfg in browser_configs:            
+            for attempt in range(1, retries + 1):
                 try:
                     async with AsyncWebCrawler() as crawler:
                         result = await crawler.arun(
@@ -193,12 +195,12 @@ class Crawl4AIExtractor:
                         f"crawl4AI_extractor.py:Crawl4AIExtractor:Attempt {attempt} failed : {e}"
                     )
 
-            # after last attempt
-            if attempt < max_retries:
-                await asyncio.sleep(2**attempt)  # exponential back-off
+            # # after last attempt
+            # if attempt < retries:
+            #     await asyncio.sleep(2**attempt)  # exponential back-off
 
         self.logger.error(
-            f"crawl4AI_extractor.py:Crawl4AIExtractor:All {max_retries} crawl attempts failed"
+            f"crawl4AI_extractor.py:Crawl4AIExtractor:All {retries} crawl attempts failed"
         )
         return None
     
