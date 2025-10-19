@@ -92,7 +92,7 @@ class NewsContentExtractor:
             # url = await WebScraperUtils.resolve_news_url_async(url)
             # url = "https://mbd.baidu.com/newspage/data/landingsuper?context=%7B%22nid%22%3A%22news_8662219630019457105%22,%22sourceFrom%22%3A%22wise_feedlist%22%7D"
 
-            self.logger.info(f"NewsContentExtractor:Scraping ------ {url}")
+            self.logger.info(f"NewsContentExtractor:Scraping ------ {url[:50]}...")
 
             # Step 1: Try trafilatura extraction
 
@@ -105,7 +105,7 @@ class NewsContentExtractor:
 
                 if traf_result and traf_result.word_count > 1000:
                     self.logger.info(
-                        f"news_content_extractor.py:NewsContentExtractor:Successfully scraped via trafilatura: {url}"
+                        f"news_content_extractor.py:NewsContentExtractor:Successfully scraped via trafilatura: {url[:50]}..."
                     )
                     return traf_result
 
@@ -116,12 +116,12 @@ class NewsContentExtractor:
 
             except Exception as e:
                 self.logger.error(
-                    f"NewsContentExtractor:Trafilatura scraping failed for {url}: {e}"
+                    f"NewsContentExtractor:Trafilatura scraping failed for {url[:50]}...: {e}"
                 )
 
             # Step 2: Fallback to Crawl4AI
             self.logger.info(
-                f"NewsContentExtractor:[Fallback] Invoking Crawl4AI for: {url}"
+                f"NewsContentExtractor:[Fallback] Invoking Crawl4AI for: {url[:50]}..."
             )
             try:               
                 proxy = choice(proxies)
@@ -132,31 +132,31 @@ class NewsContentExtractor:
                     raise ValueError("Crawl4AI returned empty or too short content.")
 
                 self.logger.info(
-                    f"news_content_extractor.py:NewsContentExtractor:Successfully scraped via Crawl4AI: {url}"
+                    f"news_content_extractor.py:NewsContentExtractor:Successfully scraped via Crawl4AI: {url[:50]}..."
                 )
 
                 # if traf_result is not None, then merge traf_result and crawl_result
                 final_result = self._merge_results(traf_result, crawl_result)
                 if final_result:
-                    self.logger.info(f"Ateet crawl4ai successfull")
+                    self.logger.info(f" crawl4ai successfull")
                 else:
-                    self.logger.error(f"Ateet crawl4ai failed")
+                    self.logger.error(f"crawl4ai failed")
                     
                     
                 return final_result
                
             except Exception as c4_err:
                 self.logger.error(
-                    f"news_content_extractor.py:NewsContentExtractor:Crawl4AI scraping failed for {url}: {c4_err}"
+                    f"news_content_extractor.py:NewsContentExtractor:Crawl4AI scraping failed for {url[:50]}...: {c4_err}"
                 )
-                raise Exception(f"Crawl4AI scraping failed for {url}: {c4_err}")
+                raise Exception(f"Crawl4AI scraping failed for {url[:50]}...: {c4_err}")
 
         except Exception as e:
             self.logger.error(
-                f"news_content_extractor.py:NewsContentExtractor:[Error] Failed to scrape {url}: {e}",
+                f"news_content_extractor.py:NewsContentExtractor:[Error] Failed to scrape {url[:50]}...: {e}",
                 exc_info=True,
             )
-            raise Exception(f"Failed to scrape {url}: {e}")
+            raise Exception(f"Failed to scrape {url[:50]}...: {e}")
 
     def _merge_results(
         self, traf_result: ExtractResult, crawl_result: ExtractResult

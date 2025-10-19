@@ -88,10 +88,10 @@ class TrafilaturaExtractor:
             ScrapingError on failure or insufficient content.
         """
         if not self._is_valid_url(url):
-            raise ScrapingError(f"Invalid URL: {url}")
+            raise ScrapingError(f"Invalid URL: {url[:50]}...")
 
         ua = user_agent or self._user_agent
-        logger.info(f"[trafilatura] scraping: {url}")
+        logger.info(f"[trafilatura] scraping: {url[:50]}...")
 
         last_err: Optional[BaseException] = None
         # if proxy:
@@ -119,7 +119,7 @@ class TrafilaturaExtractor:
                 result: ExtractResult = await self.trafilatura_from_html(
                     downloaded, url
                 )
-                logger.info(f"[trafilatura] success: {url} (words={result.word_count})")
+                logger.info(f"[trafilatura] success: {url[:50]}... (words={result.word_count})")
                 return result
 
             except (asyncio.TimeoutError, ScrapingError) as e:
@@ -127,7 +127,7 @@ class TrafilaturaExtractor:
                 if attempt < self.max_retries - 1:
                     delay = self.retry_delay * (2**attempt)
                     logger.warning(
-                        f"[trafilatura] retry {attempt+1}/{self.max_retries} in {delay}s: {url} ({e})"
+                        f"[trafilatura] retry {attempt+1}/{self.max_retries} in {delay}s: {url[:50]}... ({e})"
                     )
                     await asyncio.sleep(delay)
                     continue
@@ -137,13 +137,13 @@ class TrafilaturaExtractor:
                 if attempt < self.max_retries - 1:
                     delay = self.retry_delay * (2**attempt)
                     logger.error(
-                        f"[trafilatura] unexpected error, retry {attempt+1}/{self.max_retries} in {delay}s: {url} ({e})"
+                        f"[trafilatura] unexpected error, retry {attempt+1}/{self.max_retries} in {delay}s: {url[:50]}... ({e})"
                     )
                     await asyncio.sleep(delay)
                     continue
                 break
 
-        logger.error(f"[trafilatura] failed to scrape {url}: {last_err}")
+        logger.error(f"[trafilatura] failed to scrape {url[:50]}...: {last_err}")
         return None
 
     async def trafilatura_from_html(
@@ -213,7 +213,7 @@ class TrafilaturaExtractor:
             )
             return result
         except Exception as e:
-            logger.error(f"Failed to scrape {url}: {e}")
+            logger.error(f"Failed to scrape {url[:50]}...: {e}")
             return None
 
     def just_scrape(self, url, proxy):
@@ -232,7 +232,7 @@ class TrafilaturaExtractor:
             response.raise_for_status()
             return response.content
         except Exception as e:
-            logger.error(f"Failed to scrape {url}: {e}")
+            logger.error(f"Failed to scrape {url[:50]}...: {e}")
             return None
 
     @staticmethod

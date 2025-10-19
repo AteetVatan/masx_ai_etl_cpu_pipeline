@@ -96,9 +96,9 @@ class BeautifulSoupExtractor:
             ScrapingError: If scraping fails after retries
         """
         if not url or not self._is_valid_url(url):
-            raise ScrapingError(f"Invalid URL: {url}")
+            raise ScrapingError(f"Invalid URL: {url[:50]}...")
 
-        logger.info(f"Starting to scrape article: {url}")
+        logger.info(f"Starting to scrape article: {url[:50]}...")
 
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -130,38 +130,38 @@ class BeautifulSoupExtractor:
                     ):
                         raise ScrapingError("Insufficient content extracted")
 
-                    logger.info(f"Successfully scraped article: {url}")
+                    logger.info(f"Successfully scraped article: {url[:50]}...")
                     return article_data
 
             except httpx.HTTPStatusError as e:
                 if e.response.status_code == 404:
-                    raise ScrapingError(f"Article not found (404): {url}")
+                    raise ScrapingError(f"Article not found (404): {url[:50]}...")
                 elif e.response.status_code >= 500:
                     logger.warning(
-                        f"Server error {e.response.status_code} for {url}, attempt {attempt + 1}"
+                        f"Server error {e.response.status_code} for {url[:50]}..., attempt {attempt + 1}"
                     )
                     if attempt < self.max_retries - 1:
                         await asyncio.sleep(self.retry_delay * (2**attempt))
                         continue
-                    raise ScrapingError(f"Server error {e.response.status_code}: {url}")
+                    raise ScrapingError(f"Server error {e.response.status_code}: {url[:50]}...")
                 else:
-                    raise ScrapingError(f"HTTP error {e.response.status_code}: {url}")
+                    raise ScrapingError(f"HTTP error {e.response.status_code}: {url[:50]}...")
 
             except httpx.TimeoutException:
-                logger.warning(f"Timeout for {url}, attempt {attempt + 1}")
+                logger.warning(f"Timeout for {url[:50]}..., attempt {attempt + 1}")
                 if attempt < self.max_retries - 1:
                     await asyncio.sleep(self.retry_delay * (2**attempt))
                     continue
-                raise ScrapingError(f"Timeout after {self.max_retries} attempts: {url}")
+                raise ScrapingError(f"Timeout after {self.max_retries} attempts: {url[:50]}...")
 
             except Exception as e:
-                logger.error(f"Unexpected error scraping {url}: {e}")
+                logger.error(f"Unexpected error scraping {url[:50]}...: {e}")
                 if attempt < self.max_retries - 1:
                     await asyncio.sleep(self.retry_delay * (2**attempt))
                     continue
-                raise ScrapingError(f"Failed to scrape {url}: {e}")
+                raise ScrapingError(f"Failed to scrape {url[:50]}...: {e}")
 
-        raise ScrapingError(f"Failed to scrape {url} after {self.max_retries} attempts")
+        raise ScrapingError(f"Failed to scrape {url[:50]}... after {self.max_retries} attempts")
 
     def _is_valid_url(self, url: str) -> bool:
         """Validate if the URL is properly formatted."""

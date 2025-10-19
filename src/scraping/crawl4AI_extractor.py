@@ -75,7 +75,7 @@ class Crawl4AIExtractor:
                 last_err = e
                 #await asyncio.sleep(1.5)
 
-        self.logger.error(f"[C4AI] All attempts failed for {url}: {last_err}")
+        self.logger.error(f"[C4AI] All attempts failed for {url[:50]}...: {last_err}")
         return None
 
 
@@ -114,15 +114,15 @@ class Crawl4AIExtractor:
 
         except TimeoutError:
             self.logger.warning(
-                f"crawl4AI_extractor.py:Crawl4AIExtractor:timed out after {timeout_sec}s for URL: {url}"
+                f"crawl4AI_extractor.py:Crawl4AIExtractor:timed out after {timeout_sec}s for URL: {url[:50]}..."
             )
         except Exception as e:
             self.logger.error(
-                f"crawl4AI_extractor.py:Crawl4AIExtractor:failed for URL {url}: {e}"
+                f"crawl4AI_extractor.py:Crawl4AIExtractor:failed for URL {url[:50]}...: {e}"
             )
 
         self.logger.error(
-            f"crawl4AI_extractor.py:Crawl4AIExtractor:crawl attempts failed for URL: {url}"
+            f"crawl4AI_extractor.py:Crawl4AIExtractor:crawl attempts failed for URL: {url[:50]}..."
         )
         return None
 
@@ -208,7 +208,7 @@ class Crawl4AIExtractor:
             )
             return result
         except Exception as e:
-            self.logger.error(f"Failed to scrape {url}: {e}")
+            self.logger.error(f"Failed to scrape {url[:50]}...: {e}")
             return None
 
     async def beautifulSoup_from_html(self, html: str, url: str) -> ExtractResult:
@@ -221,5 +221,5 @@ class Crawl4AIExtractor:
             )
             return result
         except Exception as e:
-            self.logger.error(f"Failed to scrape {url}: {e}")
+            self.logger.error(f"Failed to scrape {url[:50]}...: {e}")
             return None
