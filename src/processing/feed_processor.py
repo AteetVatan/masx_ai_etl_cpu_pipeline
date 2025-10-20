@@ -126,12 +126,9 @@ class FeedProcessor:
         try:
             logger.info(f"Processing feed entries for date: {self.date}")
 
-            # Load feed entries if not already loaded
-            if self.date not in self.all_feed_entries:
-                feed_entries = await self._load_feed_entries()
-                self.all_feed_entries[self.date] = feed_entries
-            else:
-                feed_entries = self.all_feed_entries[self.date]
+            # Load feed entries
+            feed_entries = await self._load_feed_entries()
+            self.all_feed_entries[self.date] = feed_entries
 
             if not feed_entries:
                 return {
