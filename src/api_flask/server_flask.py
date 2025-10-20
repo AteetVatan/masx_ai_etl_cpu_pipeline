@@ -364,6 +364,70 @@ async def process_feed_entries_by_flashpoint():
     except Exception as e:
         logger.error(f"Unexpected error during processing: {e}")
         return jsonify({"detail": f"Processing failed: {str(e)}"}), 500
+    
+    
+
+@app.route("/feed/process/article_id", methods=["POST"])
+@async_route
+async def process_feed_entries_by_article_id():
+    """
+    Process feed entries for a specific date and flashpoint ID.
+
+    This endpoint processes feed entries from the feed_entries_{date} table
+    filtered by flashpoint_id through the complete pipeline.
+    If no date is provided, uses today's date.
+
+    Request body:
+    {
+        "date": "2025-07-01",  # Optional, defaults to today
+        "flashpoint_id": "70ef3f5a-3dbd-4b9a-8eb5-1b971a37fbc0",  # Required
+        "article_id": "3e0d011b-7ec4-4d16-9c18-b4169057faf8",  # Required
+        "trigger": "masxai"  # Optional, for background processing
+    }
+    """
+    try:
+        # Parse request data
+        data = request.get_json() or {}
+        date = data.get("date")
+        flashpoint_id = data.get("flashpoint_id")
+        article_id = data.get("article_id")
+        trigger = data.get("trigger")
+        logger.info(f"Processing feed entries for date: {date}, flashpoint_id: {flashpoint_id}, article_id: {article_id}")
+        
+        feed_processor = get_feed_processor()       
+        
+        # Validate date
+        if not date:
+            return jsonify({"detail": "date is required"}), 400
+        
+        # Validate date format
+        try:
+            validated_date = validate_and_raise(date, "date")
+        except ValueError as e:
+            return jsonify({"detail": str(e)}), 400
+
+        # Validate flashpoint_id
+        if not flashpoint_id:
+            return jsonify({"detail": "flashpoint_id is required"}), 400
+        
+        # Validate article_id
+        if not article_id:
+            return jsonify({"detail": "article_id is required"}), 400
+
+        # Process feed entries by flashpoint ID
+        feed_processor.set_date(validated_date)       
+
+        result = await feed_processor.process_by_article_id(
+            flashpoint_id, article_id
+        )
+        return jsonify(result)
+
+    except DatabaseError as e:
+        logger.error(f"Database error during processing: {e}")
+        return jsonify({"detail": f"Table feed_entries_{date} not available"}), 404
+    except Exception as e:
+        logger.error(f"Unexpected error during processing: {e}")
+        return jsonify({"detail": f"Processing failed: {str(e)}"}), 500
 
 
 @app.route("/ready", methods=["GET"])

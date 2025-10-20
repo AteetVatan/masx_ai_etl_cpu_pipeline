@@ -247,6 +247,70 @@ class DatabaseClientAndPool:
                 raise DatabaseError(
                     f"Failed to fetch feed entries for date {date} and flashpoint_id {flashpoint_id}: {e}"
                 )
+                
+               
+            
+    async def fetch_feed_entries_by_article_id(
+        self, date: str, flashpoint_id: str, article_id: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Fetch feed entries for a specific date, flashpoint_id and article_id.
+
+        Args:
+            date: Date in YYYY-MM-DD format (e.g., "2025-07-02")
+            flashpoint_id: Flashpoint ID to filter by
+            article_id: Article ID to filter by
+        Returns:
+            List of feed entry dictionaries
+
+        Raises:
+            DatabaseError: If fetch operation fails
+            ValueError: If date format is invalid
+        """
+        if not self.client:
+            raise ConnectionError("Database client not connected")
+
+        # Validate date format
+        date = validate_and_raise(date, "date")
+
+        try:
+            table_name = format_date_for_table(date)
+
+            # Try to fetch entries filtered by flashpoint_id
+            # If table doesn't exist, Supabase will return an error
+            result = (
+                self.client.table(table_name)
+                .select("*")
+                .eq("flashpoint_id", flashpoint_id)
+                .eq("id", article_id)
+                .execute()
+            )
+
+            if result.data is None:
+                self.logger.warning(
+                    f"No feed entries found for flashpoint_id {flashpoint_id} in table {table_name}"
+                )
+                return []
+
+            self.logger.info(
+                f"Fetched {len(result.data)} feed entries for flashpoint_id {flashpoint_id} from {table_name}"
+            )
+            return result.data
+
+        except Exception as e:
+            error_msg = str(e)
+            if (
+                "relation" in error_msg.lower()
+                and "does not exist" in error_msg.lower()
+            ):
+                raise DatabaseError(f"Table feed_entries_{date} not available")
+            else:
+                self.logger.error(
+                    f"Failed to fetch feed entries for date {date} and flashpoint_id {flashpoint_id}: {e}"
+                )
+                raise DatabaseError(
+                    f"Failed to fetch feed entries for date {date} and flashpoint_id {flashpoint_id}: {e}"
+                )            
 
     async def fetch_articles_batch(
         self, limit: int = None, offset: int = 0, status: str = "pending"

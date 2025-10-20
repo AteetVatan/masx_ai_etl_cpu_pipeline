@@ -274,6 +274,87 @@ class FeedProcessor:
                 "message": "Unexpected error during processing",
                 "timestamp": datetime.utcnow().isoformat(),
             }
+            
+    async def process_by_article_id(
+        self, flashpoint_id: str, article_id: str
+        ) -> Dict[str, Any]:
+        """
+        Process feed entries for a specific date and article_id.
+
+        Args:
+            date: Date in YYYY-MM-DD format (e.g., "2025-07-02")
+            flashpoint_id: Flashpoint ID to filter by
+
+        Returns:
+            Dictionary containing processing results
+
+        Raises:
+            ValueError: If date format is invalid
+        """
+
+        try:
+            logger.info(
+                f"Processing feed entries for date: {self.date}, flashpoint_id: {flashpoint_id}, article_id: {article_id}"
+            )
+
+            # Load feed entries filtered by flashpoint_id
+            feed_entry = await self._load_feed_entry_by_article_id(flashpoint_id, article_id)
+
+            if not feed_entry:
+                return {
+                    "status": "no_entries",
+                    "date": self.date,
+                    "flashpoint_id": flashpoint_id,
+                    "article_id": article_id,
+                    "message": f"No feed entries found for date {self.date} and flashpoint_id {flashpoint_id}",
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
+
+            proxy_service = ProxyService.get_instance()
+            await proxy_service.ping_start_proxy()
+
+            # Process filtered entries
+            results = await self._process_feed_entries(feed_entry)
+
+            await proxy_service.ping_stop_proxy()
+
+            # Update statistics
+            self.processing_stats["total_processed"] = 1
+            self.processing_stats["successful"] += results["successful"]
+            self.processing_stats["failed"] += results["failed"]
+            self.processing_stats["last_processed_date"] = self.date
+
+            return {
+                "status": "completed",
+                "date": self.date,
+                "flashpoint_id": flashpoint_id,
+                "successful": results["successful"],
+                "failed": results["failed"],
+                "processing_time": results["processing_time"],
+                "message": f"Processed feed entry for date {self.date} and flashpoint_id {flashpoint_id} and article_id {article_id}",
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+
+        except DatabaseError as e:
+            logger.error(f"Database error during processing: {e}")
+            return {
+                "status": "error",
+                "date": self.date,
+                "flashpoint_id": flashpoint_id,
+                "error": str(e),
+                "message": f"Table feed_entries_{self.date} not available",
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+        except Exception as e:
+            logger.error(f"Unexpected error during processing: {e}")
+            return {
+                "status": "error",
+                "date": self.date,
+                "flashpoint_id": flashpoint_id,
+                "error": str(e),
+                "message": "Unexpected error during processing",
+                "timestamp": datetime.utcnow().isoformat(),
+            }
 
     async def _load_feed_entries(self) -> List[Dict[str, Any]]:
         """Load feed entries for a specific date."""
@@ -285,6 +366,14 @@ class FeedProcessor:
         """Load feed entries for a specific date and flashpoint_id."""
         return await db_connection.fetch_feed_entries_by_flashpoint_id(
             self.date, flashpoint_id
+        )
+        
+    async def _load_feed_entry_by_article_id(
+        self, flashpoint_id: str, article_id: str
+    ) -> List[Dict[str, Any]]:
+        """Load feed entries for a specific date and article_id."""
+        return await db_connection.fetch_feed_entries_by_article_id(
+            self.date, flashpoint_id, article_id
         )
 
     async def _process_feed_entries(
