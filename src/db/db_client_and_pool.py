@@ -162,17 +162,32 @@ class DatabaseClientAndPool:
             table_name = format_date_for_table(date)
 
             # Try to fetch all entries from the table
-            # If table doesn't exist, Supabase will return an error
-            result = self.client.table(table_name).select("*").execute()
+            # If table doesn't exist, Supabase will return an error            
+            #result = self.client.schema("public").table(table_name).select("*").execute()           
+            
+            batch_size = 1000
+            offset = 0
+            all_rows = []
 
-            if result.data is None:
+            while True:
+                res = self.client.schema("public").table(table_name)\
+                    .select("*")\
+                    .range(offset, offset + batch_size - 1)\
+                    .execute()
+                
+                if not res.data:
+                    break
+
+                all_rows.extend(res.data)
+                offset += batch_size
+            if len(all_rows) == 0:
                 self.logger.warning(f"No feed entries found in table {table_name}")
                 return []
 
             self.logger.info(
-                f"Fetched {len(result.data)} feed entries from {table_name}"
+                f"Fetched {len(all_rows)} feed entries from {table_name}"
             )
-            return result.data
+            return all_rows
 
         except Exception as e:
             error_msg = str(e)
