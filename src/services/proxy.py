@@ -127,17 +127,13 @@ class ProxyService:
     async def get_proxy_cache(self, force_refresh: bool = False) -> List[str]:
         """Get the proxy cache, refreshing if expired."""
         if not self._proxy_cache or force_refresh:
-            self._proxy_cache = await self.__get_proxies()
+            self._proxy_cache = await self.__get_proxies()           
 
-        return self._proxy_cache   
-
-
-     
+        return self._proxy_cache 
     
     async def validate_proxies(self, proxies: List[str]) -> List[str]:
         """Validate the proxies from the proxy service."""
-        import requests
-        proxies = await self.get_proxy_cache()
+        import requests#
         valid_proxies = []
         for proxy in proxies:
             try:
@@ -306,6 +302,8 @@ class ProxyService:
                             error_msg = f"Proxy service returned error: {proxy_response.message}"
                             self.logger.error(error_msg)
                             raise ServiceException(error_msg)
+                        
+                        
 
                         proxy_count = len(proxy_response.data)
                         self.logger.info(
@@ -313,15 +311,17 @@ class ProxyService:
                         )
 
                         # Validate proxy data
+                        
                         if not proxy_response.data:
                             self.logger.warning("No proxies returned from service")
                             return []
+                        proxy_data = await self.validate_proxies(proxy_response.data)
 
                         # Cache proxies
-                        self._proxy_cache = proxy_response.data
+                        self._proxy_cache = proxy_data
 
                         # Return proxy list
-                        return proxy_response.data
+                        return proxy_data
 
                     elif response.status == 401:
                         error_msg = "Unauthorized - Invalid proxy API key"

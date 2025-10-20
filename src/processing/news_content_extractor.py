@@ -127,8 +127,7 @@ class NewsContentExtractor:
             try:                
                 # first try quick crawl4ai scrape
                 try:
-                    crawl_result: ExtractResult = await self.crawl4AIExtractor.crawl4ai_scrape(url)
-                    crawl_result = None
+                    crawl_result: ExtractResult = await self.crawl4AIExtractor.crawl4ai_scrape(url)                    
                 except Exception as e:
                     self.logger.error(f"NewsContentExtractor:Normal Crawl4AI scraping failed for {url[:50]}...: {e}")
                     

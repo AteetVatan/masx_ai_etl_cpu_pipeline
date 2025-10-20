@@ -150,7 +150,7 @@ class Crawl4AIExtractor:
         timeout_sec: int = 60000,  # maximum 1 minute
     ) -> ExtractResult:
         from src.scraping import WebScraperUtils
-        proxies = await self.proxy_service.validate_proxies(proxies)
+        #proxies = await self.proxy_service.validate_proxies(proxies)
         #browser_configs = c4a_configs.get_browser_presets()
         config = c4a_configs.get_crawl4ai_config(proxies)
         
@@ -172,9 +172,14 @@ class Crawl4AIExtractor:
                         f"Crawl failed with error: {result.error_message or 'unknown error'}"
                     )
 
-                scrap_result: ExtractResult = await self.trafilatura_from_html(
-                    result.cleaned_html, url
-                )
+                try:
+                    scrap_result: ExtractResult = await self.trafilatura_from_html(
+                        result.cleaned_html, url
+                    )
+                except Exception as e:
+                    scrap_result: ExtractResult = await self.beautifulSoup_from_html(
+                        result.cleaned_html, url
+                    )
                 # images = WebScraperUtils.extract_image_urls(scrap_result.content)
                 # scrap_result.images = images
                 if WebScraperUtils.find_error_pattern(scrap_result.content):
