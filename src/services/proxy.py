@@ -30,6 +30,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from threading import Lock
 import contextlib
+import requests
+import concurrent.futures
 
 from src.config import get_settings, get_service_logger
 from src.core.exceptions import ServiceException
@@ -132,19 +134,36 @@ class ProxyService:
         return self._proxy_cache 
     
     async def validate_proxies(self, proxies: List[str]) -> List[str]:
-        """Validate the proxies from the proxy service."""
-        import requests#
-        valid_proxies = []
-        for proxy in proxies:
+        """Validate the proxies concurrently using multithreading."""
+        def check_proxy(proxy: str) -> str | None:
+            """Runs in threadpool: validates a single proxy."""
             try:
-                r = requests.get("https://httpbin.org/ip", proxies={"http": f"http://{proxy}", "https": f"http://{proxy}"}, timeout=5)
+                r = requests.get(
+                    "https://httpbin.org/ip",
+                    proxies={"http": f"http://{proxy}", "https": f"http://{proxy}"},
+                    timeout=5,
+                )
                 if r.status_code == 200:
-                    valid_proxies.append(proxy)
-            except Exception as e:
-                #print(proxy, "FAILED:", e)
-                pass
-        self.logger.info(f"Validated {len(valid_proxies)} proxies out of {len(proxies)}")
+                    return proxy
+            except Exception:
+                return None
+            return None
+
+        # ThreadPoolExecutor handles blocking I/O concurrently
+        valid_proxies: List[str] = []
+        loop = asyncio.get_event_loop()
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            # Map each proxy to a future
+            tasks = [loop.run_in_executor(executor, check_proxy, proxy) for proxy in proxies]
+            for f in asyncio.as_completed(tasks):
+                result = await f
+                if result:
+                    valid_proxies.append(result)
+
+        self.logger.info(f"✅ Validated {len(valid_proxies)} proxies out of {len(proxies)}")
         return valid_proxies
+
     
 
     async def _refresh(self):
@@ -258,6 +277,9 @@ class ProxyService:
             error_msg = f"Unexpected error during proxy start operation: {str(e)}"
             self.logger.error(error_msg)
             raise ServiceException(error_msg)
+        
+    async def ping_stop_proxy(self) -> ProxyStartResponse:
+        await self.stop_proxy_refresher()
 
     async def __get_proxies(self) -> List[str]:
         """

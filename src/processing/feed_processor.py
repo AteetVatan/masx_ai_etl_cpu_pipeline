@@ -147,14 +147,14 @@ class FeedProcessor:
             proxy_service = ProxyService.get_instance()
             await proxy_service.ping_start_proxy()
             # await proxy_service.start_proxy_refresher()
-            proxies = await proxy_service.get_proxy_cache()
+            #proxies = await proxy_service.get_proxy_cache()
 
             if batch_mode:
                 results = await self._process_feed_entries_batch(feed_entries)
             else:
                 results = await self._process_feed_entries(feed_entries)
 
-            await proxy_service.stop_proxy_refresher()
+            await proxy_service.ping_stop_proxy()
 
             # Update statistics
             self.processing_stats["total_processed"] += len(feed_entries)
@@ -234,7 +234,7 @@ class FeedProcessor:
             # Process filtered entries
             results = await self._process_feed_entries(feed_entries)
 
-            await proxy_service.stop_proxy_refresher()
+            await proxy_service.ping_stop_proxy()
 
             # Update statistics
             self.processing_stats["total_processed"] += len(feed_entries)
