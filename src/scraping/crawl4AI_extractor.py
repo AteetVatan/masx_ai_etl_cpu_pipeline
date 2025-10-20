@@ -96,7 +96,7 @@ class Crawl4AIExtractor:
     async def crawl4ai_scrape(
         self,
         url: str,
-        timeout_sec: int = 3600,  # maximum 1 minute
+        timeout_sec: int = 60000,  # maximum 1 minute
     ) -> ExtractResult:
         from src.scraping import WebScraperUtils
        
