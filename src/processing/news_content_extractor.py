@@ -57,7 +57,7 @@ class NewsContentExtractor:
             )
             # proxies = await ProxyManager.proxies_async()
 
-            proxies = await self.proxy_service.get_proxy_cache(force_refresh=True)
+            proxies = await self.proxy_service.get_proxy_cache()
             
 
             self.logger.info(

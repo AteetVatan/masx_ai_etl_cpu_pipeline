@@ -311,12 +311,12 @@ class FeedProcessor:
                 }
 
             proxy_service = ProxyService.get_instance()
-            await proxy_service.ping_start_proxy()
+            #await proxy_service.ping_start_proxy()
 
             # Process filtered entries
             results = await self._process_feed_entries(feed_entry)
 
-            await proxy_service.ping_stop_proxy()
+            #await proxy_service.ping_stop_proxy()
 
             # Update statistics
             self.processing_stats["total_processed"] = 1
