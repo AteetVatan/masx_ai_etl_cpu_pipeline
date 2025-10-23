@@ -284,104 +284,74 @@ class ProxyService:
     async def __get_proxies(self) -> List[str]:
         """
         Retrieve list of available proxies from the proxy service.
-
-        Returns:
-            List[str]: List of proxy addresses in format "IP:PORT"
-
-        Raises:
-            ServiceException: If the proxy retrieval operation fails
+        Retries once automatically if no proxies are returned.
         """
-        try:
-            self.logger.info("Retrieving proxy list...")
+        async def fetch_proxies_once(attempt: int = 1) -> List[str]:
+            try:
+                self.logger.info(f"Retrieving proxy list (attempt {attempt})...")
 
-            # Validate configuration
-            if not self.settings.proxy_api_key:
-                raise ServiceException("Proxy API key not configured")
+                if not self.settings.proxy_api_key:
+                    raise ServiceException("Proxy API key not configured")
 
-            # Prepare request
-            url = f"{self.base_url}{self.proxies_endpoint}"
-            self.logger.debug(f"Calling proxy list endpoint: {url}")
+                url = f"{self.base_url}{self.proxies_endpoint}"
+                self.logger.debug(f"Calling proxy list endpoint: {url}")
 
-            # Make GET request
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    url,
-                    headers=self.headers,
-                    timeout=aiohttp.ClientTimeout(total=5 * 60),  # 5 minutes
-                ) as response:
-                    if response.status == 200:
-                        response_data = await response.json()
-                        self.logger.info("Proxy list retrieved successfully")
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(
+                        url,
+                        headers=self.headers,
+                        timeout=aiohttp.ClientTimeout(total=5 * 60),  # 5 minutes
+                    ) as response:
+                        if response.status != 200:
+                            if response.status == 401:
+                                raise ServiceException("Unauthorized - Invalid proxy API key")
+                            if response.status == 429:
+                                raise ServiceException("Rate limited - Too many requests to proxy service")
+                            error_data = await response.text()
+                            raise ServiceException(f"Proxy retrieval failed: {response.status} {error_data}")
 
-                        # Parse response
+                        data = await response.json()
                         proxy_response = ProxyListResponse(
-                            success=response_data.get("success", False),
-                            data=response_data.get("data", []),
-                            message=response_data.get("message", ""),
+                            success=data.get("success", False),
+                            data=data.get("data", []),
+                            message=data.get("message", ""),
                         )
 
                         if not proxy_response.success:
-                            error_msg = f"Proxy service returned error: {proxy_response.message}"
-                            self.logger.error(error_msg)
-                            raise ServiceException(error_msg)
-                        
-                        
+                            raise ServiceException(f"Proxy service error: {proxy_response.message}")
 
                         proxy_count = len(proxy_response.data)
-                        self.logger.info(
-                            f"Retrieved {proxy_count} proxies: {proxy_response.message}"
-                        )
+                        self.logger.info(f"Retrieved {proxy_count} proxies: {proxy_response.message}")
 
-                        # Validate proxy data
-                        
                         if not proxy_response.data:
                             self.logger.warning("No proxies returned from service")
                             return []
+
+                        # Validate proxies
                         proxy_data = await self.validate_proxies(proxy_response.data)
-
-                        # Cache proxies
                         self._proxy_cache = proxy_data
-
-                        # Return proxy list
                         return proxy_data
 
-                    elif response.status == 401:
-                        error_msg = "Unauthorized - Invalid proxy API key"
-                        self.logger.error(error_msg)
-                        raise ServiceException(error_msg)
+            except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+                raise ServiceException(f"Network or timeout error during proxy retrieval: {str(e)}")
+            except Exception as e:
+                raise ServiceException(f"Unexpected error during proxy retrieval: {str(e)}")
 
-                    elif response.status == 429:
-                        error_msg = "Rate limited - Too many requests to proxy service"
-                        self.logger.warning(error_msg)
-                        raise ServiceException(error_msg)
+        # --- Main Logic with Retry ---
+        proxies = await fetch_proxies_once(attempt=1)
 
-                    else:
-                        error_msg = (
-                            f"Proxy retrieval failed with status {response.status}"
-                        )
-                        try:
-                            error_data = await response.text()
-                            error_msg += f": {error_data}"
-                        except:
-                            pass
+        if not proxies:
+            self.logger.warning("No valid proxies found — retrying once after 2 seconds...")
+            await asyncio.sleep(2)
+            proxies = await fetch_proxies_once(attempt=2)
 
-                        self.logger.error(error_msg)
-                        raise ServiceException(error_msg)
+            if not proxies:
+                self.logger.error("Retry failed — no proxies available after second attempt.")
+            else:
+                self.logger.info(f"Retry succeeded — retrieved {len(proxies)} proxies.")
 
-        except aiohttp.ClientError as e:
-            error_msg = f"Network error during proxy retrieval: {str(e)}"
-            self.logger.error(error_msg)
-            raise ServiceException(error_msg)
+        return proxies
 
-        except asyncio.TimeoutError:
-            error_msg = "Timeout error during proxy retrieval"
-            self.logger.error(error_msg)
-            raise ServiceException(error_msg)
-
-        except Exception as e:
-            error_msg = f"Unexpected error during proxy retrieval: {str(e)}"
-            self.logger.error(error_msg)
-            raise ServiceException(error_msg)
 
     async def health_check(self) -> bool:
         """
