@@ -309,7 +309,7 @@ class FeedProcessor:
 
             proxy_service = ProxyService.get_instance()
             await proxy_service.ping_start_proxy()
-            proxies = await proxy_service.get_proxy_cache(force_refresh=True)
+            #proxies = await proxy_service.get_proxy_cache(force_refresh=True)
             # Process filtered entries
             results = await self.process_feed_entries_batch(feed_entries)
 
