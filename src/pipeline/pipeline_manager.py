@@ -518,10 +518,10 @@ class PipelineManager:
         title = extracted_data.title
         language = extracted_data.language
 
-        proxies = await self.proxy_service.get_proxy_cache()
+        #proxies = await self.proxy_service.get_proxy_cache()
 
         title_en = await self.translation_manager.translate(
-            title, source=language, target="en", proxies=proxies
+            title, source=language, target="en"
         )
         extracted_data.title_en = title_en if title_en else ""
         return extracted_data
