@@ -263,7 +263,82 @@ class DatabaseClientAndPool:
                     f"Failed to fetch feed entries for date {date} and flashpoint_id {flashpoint_id}: {e}"
                 )
                 
-               
+
+
+    async def fetch_feed_entries_by_article_ids(
+        self, date: str, article_ids: List[str]
+    ) -> List[Dict[str, Any]]:
+        """
+        Fetch multiple feed entries for a specific date and list of article IDs in parallel.
+
+        Args:
+            date: Date in YYYY-MM-DD format (e.g., "2025-07-02")
+            article_ids: List of article UUIDs
+
+        Returns:
+            List of feed entry dictionaries
+        """
+        if not self.client:
+            raise ConnectionError("Database client not connected")
+
+        date = validate_and_raise(date, "date")
+
+        if not article_ids:
+            return []
+
+        table_name = format_date_for_table(date)
+        chunk_size = 50  # safe batch size
+
+        def chunk_list(lst, size):
+            for i in range(0, len(lst), size):
+                yield lst[i:i + size]
+
+        async def fetch_chunk(chunk: List[str]) -> List[Dict[str, Any]]:
+            """Fetch a chunk safely (with retry on transient failure)."""
+            try:
+                res = (
+                    self.client.table(table_name)
+                    .select("*")
+                    .in_("id", chunk)
+                    .execute()
+                )
+                return res.data or []
+            except Exception as e:
+                self.logger.warning(f"Chunk fetch failed: {e}")
+                await asyncio.sleep(1)
+                try:
+                    res = (
+                        self.client.table(table_name)
+                        .select("*")
+                        .in_("id", chunk)
+                        .execute()
+                    )
+                    return res.data or []
+                except Exception as e2:
+                    self.logger.error(f"Chunk retry failed: {e2}")
+                    return []
+
+        try:
+            tasks = [fetch_chunk(chunk) for chunk in chunk_list(article_ids, chunk_size)]
+            results = await asyncio.gather(*tasks)
+
+            all_results = [item for sublist in results for item in sublist]
+
+            if not all_results:
+                self.logger.warning(f"No feed entries found in {table_name}")
+                return []
+
+            self.logger.info(f"Fetched {len(all_results)} feed entries from {table_name}")
+            return all_results
+
+        except Exception as e:
+            msg = str(e)
+            if "relation" in msg.lower() and "does not exist" in msg.lower():
+                raise DatabaseError(f"Table feed_entries_{date} not available")
+            else:
+                self.logger.error(f"Failed to fetch feed entries for {date}: {e}")
+                raise DatabaseError(f"Failed to fetch feed entries for {date}: {e}")
+                            
             
     async def fetch_feed_entries_by_article_id(
         self, date: str, flashpoint_id: str, article_id: str

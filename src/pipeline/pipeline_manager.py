@@ -103,8 +103,7 @@ class PipelineManager:
         start_time = time.time()
         processing_steps = []
         errors = []
-        extracted_data: ExtractResult = None
-        proxies = await self.proxy_service.get_proxy_cache(force_refresh=True)
+        extracted_data: ExtractResult = None       
         try:
             extracted_data = ExtractResult()
             extracted_data.id = article_id

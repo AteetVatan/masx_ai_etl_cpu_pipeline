@@ -108,7 +108,7 @@ class FeedProcessor:
             }
 
     async def process_all_feed_entries(
-        self, batch_mode: bool = False
+        self, feed_entries, batch_mode: bool = False
     ) -> Dict[str, Any]:
         """
         Process all feed entries for a specific date.
@@ -147,7 +147,7 @@ class FeedProcessor:
             #proxies = await proxy_service.get_proxy_cache()
 
             if batch_mode:
-                results = await self._process_feed_entries_batch(feed_entries)
+                results = await self.process_feed_entries_batch(feed_entries)
             else:
                 results = await self._process_feed_entries(feed_entries)
 
@@ -272,6 +272,84 @@ class FeedProcessor:
                 "timestamp": datetime.utcnow().isoformat(),
             }
             
+            
+    async def process_articles_batch(
+        self, articles_ids: List[str]
+        ) -> Dict[str, Any]:
+        """
+        Process feed entries for a specific date and article_id.
+
+        Args:
+            date: Date in YYYY-MM-DD format (e.g., "2025-07-02")
+            articles_ids: list of articles_ids
+
+        Returns:
+            Dictionary containing processing results
+
+        Raises:
+            ValueError: If date format is invalid
+        """
+
+        try:
+            logger.info(
+                f"Processing feed entries for date: {self.date}, length of articles: {len(articles_ids)}"
+            )
+
+            # Load feed entries filtered by flashpoint_id
+            feed_entries = await self._load_feed_entries_by_articles_ids(articles_ids)
+
+            if not feed_entries:
+                return {
+                    "status": "no_entries",
+                    "date": self.date,
+                    "articles_ids": articles_ids,
+                    "message": f"No feed entries found for date {self.date} and articles {articles_ids}",
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
+
+            proxy_service = ProxyService.get_instance()
+            await proxy_service.ping_start_proxy()
+            proxies = await self.proxy_service.get_proxy_cache(force_refresh=True)
+            # Process filtered entries
+            results = await self.process_feed_entries_batch(feed_entries)
+
+            await proxy_service.ping_stop_proxy()
+
+            # Update statistics
+            self.processing_stats["total_processed"] = 1
+            self.processing_stats["successful"] += results["successful"]
+            self.processing_stats["failed"] += results["failed"]
+            self.processing_stats["last_processed_date"] = self.date
+
+            return {
+                "status": "completed",
+                "date": self.date,
+                "successful": results["successful"],
+                "failed": results["failed"],
+                "processing_time": results["processing_time"],
+                "message": f"Processed feed entries for date {self.date} and articles {articles_ids}",
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+
+        except DatabaseError as e:
+            logger.error(f"Database error during processing: {e}")
+            return {
+                "status": "error",
+                "date": self.date,
+                "error": str(e),
+                "message": f"Table feed_entries_{self.date} not available",
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+        except Exception as e:
+            logger.error(f"Unexpected error during processing: {e}")
+            return {
+                "status": "error",
+                "date": self.date,
+                "error": str(e),
+                "message": "Unexpected error during processing",
+                "timestamp": datetime.utcnow().isoformat(),
+            }         
+            
     async def process_by_article_id(
         self, flashpoint_id: str, article_id: str
         ) -> Dict[str, Any]:
@@ -364,6 +442,15 @@ class FeedProcessor:
         return await db_connection.fetch_feed_entries_by_flashpoint_id(
             self.date, flashpoint_id
         )
+   
+    async def _load_feed_entries_by_articles_ids(
+        self, article_ids: list[str]
+    ) -> List[Dict[str, Any]]:
+        """Load feed entries for a specific date and article_id."""
+        return await db_connection.fetch_feed_entries_by_article_ids(
+            self.date, article_ids
+        )
+   
         
     async def _load_feed_entry_by_article_id(
         self, flashpoint_id: str, article_id: str
@@ -427,7 +514,7 @@ class FeedProcessor:
             "processing_time": processing_time,
         }
 
-    async def _process_feed_entries_batch(
+    async def process_feed_entries_batch(
         self, feed_entries: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
         """Process a list of feed entries through the pipeline in batch mode."""

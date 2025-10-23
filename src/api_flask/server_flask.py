@@ -365,9 +365,69 @@ async def process_feed_entries_by_flashpoint():
         logger.error(f"Unexpected error during processing: {e}")
         return jsonify({"detail": f"Processing failed: {str(e)}"}), 500
     
-    
 
-@app.route("/feed/process/article_id", methods=["POST"])
+
+@app.route("/feed/process/batch_articles", methods=["POST"])
+@async_route
+async def process_batch_articles():
+    """
+    Process feed entries for a specific date and flashpoint ID.
+
+    This endpoint processes feed entries from the feed_entries_{date} table
+    filtered by flashpoint_id through the complete pipeline.
+    If no date is provided, uses today's date.
+
+    Request body:
+    {
+        "date": "2025-07-02",  # Optional, defaults to today
+        "articles_ids": ["0015b088-3fdf-4f0f-bfa5-27dff8e1d3e7","00170f44-067b-47be-b198-7d92ece35727"],  # Required
+        "trigger": "masxai"  # Optional, for background processing
+    }
+    """
+    try:
+        # Parse request data
+        data = request.get_json() or {}
+        date = data.get("date","")
+        
+        articles_ids = data.get("articles_ids",[])
+      
+        trigger = data.get("trigger")
+        logger.info(f"Processing feed entries for date: {date}, length of articles: {len(articles_ids)}")
+        
+        feed_processor = get_feed_processor()       
+        
+        # Validate date
+        if not date:
+            return jsonify({"detail": "date is required"}), 400
+        
+        if len(articles_ids) == 0:
+            return jsonify({"detail": "articles are required"}), 400
+        
+        # Validate date format
+        try:
+            validated_date = validate_and_raise(date, "date")
+        except ValueError as e:
+            return jsonify({"detail": str(e)}), 400
+
+
+        # Process feed entries by articles IDs
+        feed_processor.set_date(validated_date)       
+
+        result = await feed_processor.process_articles_batch(
+            articles_ids
+        )
+        return jsonify(result)
+
+    except DatabaseError as e:
+        logger.error(f"Database error during processing: {e}")
+        return jsonify({"detail": f"Table feed_entries_{date} not available"}), 404
+    except Exception as e:
+        logger.error(f"Unexpected error during processing: {e}")
+        return jsonify({"detail": f"Processing failed: {str(e)}"}), 500
+    
+        
+
+@app.route("/feed/process/article", methods=["POST"])
 @async_route
 async def process_feed_entries_by_article_id():
     """
