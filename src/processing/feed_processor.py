@@ -141,8 +141,8 @@ class FeedProcessor:
             # Process all entries
             results = {"successful": 0, "failed": 0, "processing_time": 0}
 
-            proxy_service = ProxyService.get_instance()
-            await proxy_service.ping_start_proxy()
+            #proxy_service = ProxyService.get_instance()
+            #await proxy_service.ping_start_proxy()
             # await proxy_service.start_proxy_refresher()
             #proxies = await proxy_service.get_proxy_cache()
 
@@ -151,7 +151,7 @@ class FeedProcessor:
             else:
                 results = await self._process_feed_entries(feed_entries)
 
-            await proxy_service.ping_stop_proxy()
+            #await proxy_service.ping_stop_proxy()
 
             # Update statistics
             self.processing_stats["total_processed"] += len(feed_entries)
@@ -223,15 +223,15 @@ class FeedProcessor:
                     "timestamp": datetime.utcnow().isoformat(),
                 }
 
-            proxy_service = ProxyService.get_instance()
-            await proxy_service.ping_start_proxy()
+            #proxy_service = ProxyService.get_instance()
+            #await proxy_service.ping_start_proxy()
             # await proxy_service.start_proxy_refresher()
-            proxies = await proxy_service.get_proxy_cache()
+            #proxies = await proxy_service.get_proxy_cache()
 
             # Process filtered entries
             results = await self._process_feed_entries(feed_entries)
 
-            await proxy_service.ping_stop_proxy()
+            #await proxy_service.ping_stop_proxy()
 
             # Update statistics
             self.processing_stats["total_processed"] += len(feed_entries)
@@ -307,13 +307,13 @@ class FeedProcessor:
                     "timestamp": datetime.utcnow().isoformat(),
                 }
 
-            proxy_service = ProxyService.get_instance()
-            await proxy_service.ping_start_proxy()
+            #proxy_service = ProxyService.get_instance()
+            #await proxy_service.ping_start_proxy()
             #proxies = await proxy_service.get_proxy_cache(force_refresh=True)
             # Process filtered entries
             results = await self.process_feed_entries_batch(feed_entries)
 
-            await proxy_service.ping_stop_proxy()
+            #await proxy_service.ping_stop_proxy()
 
             # Update statistics
             self.processing_stats["total_processed"] = 1
