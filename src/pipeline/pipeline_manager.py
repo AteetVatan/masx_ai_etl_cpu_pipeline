@@ -510,10 +510,12 @@ class PipelineManager:
         return scraped_data
 
     async def _translate_title(self, extracted_data: ExtractResult) -> ExtractResult:
-        """Translate title and language detection."""
+        """Translate title and language detection."""        
         if extracted_data.language == "en":
             extracted_data.title_en = extracted_data.title
-            return extracted_data
+        else:
+            extracted_data.title_en = ""
+        return extracted_data
 
         title = extracted_data.title
         language = extracted_data.language
