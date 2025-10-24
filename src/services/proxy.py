@@ -328,9 +328,9 @@ class ProxyService:
                             return []
 
                         # Validate proxies
-                        proxy_data = await self.validate_proxies(proxy_response.data)
-                        self._proxy_cache = proxy_data
-                        return proxy_data
+                        #proxy_data = await self.validate_proxies(proxy_response.data)
+                        self._proxy_cache = proxy_response.data
+                        return proxy_response.data
 
             except (aiohttp.ClientError, asyncio.TimeoutError) as e:
                 raise ServiceException(f"Network or timeout error during proxy retrieval: {str(e)}")
