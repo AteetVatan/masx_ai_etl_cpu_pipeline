@@ -124,11 +124,11 @@ class PipelineManager:
             processing_steps.append("language_setting")
 
             # Step 3: Translate title
-            logger.debug(
-                f"Step 3: Translating title and language detection for article {article_id}"
-            )
-            extracted_data = await self._translate_title(extracted_data)
-            processing_steps.append("translation")
+            #logger.debug(
+            #    f"Step 3: Translating title and language detection for article {article_id}"
+            #)
+            #extracted_data = await self._translate_title(extracted_data)
+            #processing_steps.append("translation")
 
             # Step 4: Metadata extraction
             logger.debug(f"Step 4: Extracting entities for article {article_id}")
@@ -141,9 +141,9 @@ class PipelineManager:
             processing_steps.append("geotagging")
 
             # Step 6: Find relevant images
-            logger.debug(f"Step 6: Finding images for article {article_id}")
-            extracted_data = await self._find_images(extracted_data)
-            processing_steps.append("image_search")
+            #logger.debug(f"Step 6: Finding images for article {article_id}")
+            #extracted_data = await self._find_images(extracted_data)
+            #processing_steps.append("image_search")
 
             # Step 7: download images to supabase
             if len(extracted_data.images) > 0:
