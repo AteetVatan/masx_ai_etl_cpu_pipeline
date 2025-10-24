@@ -441,7 +441,7 @@ class PipelineManager:
 
         return {"successful": successful, "failed": failed, "results": results}
 
-    async def _scrape_article(self, extracted_data: ExtractResult) -> ExtractResult:
+    async def _scrape_article_old(self, extracted_data: ExtractResult) -> ExtractResult:
         """Scrape article content with fallback."""
         try:
             # Try primary scraper first
@@ -452,8 +452,43 @@ class PipelineManager:
                 raise Exception("Failed to scrape article")
             return extracted_data
         except Exception as e:
-            logger.error(f"Fallback scraper also failed for {extracted_data.ur}: {e}")
+            logger.error(f"Fallback scraper also failed for {extracted_data.url}: {e}")
             raise e
+    
+    async def _scrape_article(self, extracted_data: ExtractResult) -> ExtractResult:
+        """
+        Scrape article content with retry and fallback.
+
+        Tries up to 2 times with a short delay between retries.
+        """
+        max_retries = 2
+        #delay_between_retries = 2  # seconds
+
+        for attempt in range(1, max_retries + 1):
+            try:
+                logger.info(f"Scraping attempt {attempt}/{max_retries} for: {extracted_data.url}")
+                
+                result: ExtractResult = await self.news_content_extractor.extract_feed(extracted_data.url)
+                
+                if not result or not getattr(result, "content", None):
+                    raise Exception("Empty or invalid article content")
+                
+                logger.info(f"Successfully scraped {extracted_data.url} on attempt {attempt}")
+                return result
+
+            except Exception as e:
+                logger.warning(
+                    f"Attempt {attempt} failed for {extracted_data.url}: {e}"
+                )
+
+                # Wait before retry if not the last attempt
+                if attempt < max_retries:
+                    #await asyncio.sleep(delay_between_retries)
+                    pass
+                else:
+                    logger.error(f"All retries failed for {extracted_data.url}: {e}")
+                    raise e    
+    
 
     async def _set_extracted_language(self, extracted: ExtractResult) -> ExtractResult:
         """Scrape article content with fallback."""
