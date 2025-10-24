@@ -146,14 +146,14 @@ class PipelineManager:
             #processing_steps.append("image_search")
 
             # Step 7: download images to supabase
-            if len(extracted_data.images) > 0:
-                logger.debug(
-                    f"Step 7: Downloading images to supabase for article {article_id}"
-                )
-                extracted_data = await self._download_images(
-                    date, flashpoint_id, extracted_data
-                )
-                processing_steps.append("image_download")
+            # if len(extracted_data.images) > 0:
+            #     logger.debug(
+            #         f"Step 7: Downloading images to supabase for article {article_id}"
+            #     )
+            #     extracted_data = await self._download_images(
+            #         date, flashpoint_id, extracted_data
+            #     )
+            #     processing_steps.append("image_download")
 
             # here update the article data with the extracted data
             article_data.title = extracted_data.title
