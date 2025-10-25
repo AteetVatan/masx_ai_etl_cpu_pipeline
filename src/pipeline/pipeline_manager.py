@@ -223,6 +223,15 @@ class PipelineManager:
         Returns:
             Dictionary containing batch processing results
         """
+        import gc
+        import psutil
+        import os
+        
+        # Memory monitoring
+        process = psutil.Process(os.getpid())
+        initial_memory = process.memory_info().rss / 1024 / 1024  # MB
+        logger.info(f"Pipeline manager memory before batch: {initial_memory:.2f} MB")
+        
         logger.info(
             f"Starting intelligent batch processing for {len(article_data_list)} articles"
         )
@@ -231,6 +240,7 @@ class PipelineManager:
         all_results = []
         total_successful = 0
         total_failed = 0
+        sub_batches = None
 
         try:
             # Calculate optimal batch size based on CPU cores and available workers
@@ -272,6 +282,11 @@ class PipelineManager:
                 # Small delay between batches to prevent resource exhaustion
                 if batch_idx < len(sub_batches):
                     await asyncio.sleep(0.1)
+                
+                # Memory cleanup after each sub-batch
+                gc.collect()
+                current_memory = process.memory_info().rss / 1024 / 1024  # MB
+                logger.debug(f"Memory after sub-batch {batch_idx}: {current_memory:.2f} MB")
 
             total_processing_time = time.time() - start_time
 
@@ -304,6 +319,30 @@ class PipelineManager:
                 "error": str(e),
                 "results": all_results,
             }
+        finally:
+            # Ensure cleanup of large data structures
+            try:
+                if sub_batches:
+                    # Clear sub-batches to free memory
+                    for sub_batch in sub_batches:
+                        sub_batch.clear()
+                    sub_batches.clear()
+                    del sub_batches
+                
+                # Clear all_results if it's large
+                if len(all_results) > 1000:  # Only clear if we have many results
+                    all_results.clear()
+                
+                # Force garbage collection
+                gc.collect()
+                
+                # Log final memory state
+                final_memory = process.memory_info().rss / 1024 / 1024  # MB
+                memory_delta = final_memory - initial_memory
+                logger.info(f"Pipeline manager memory after cleanup: {final_memory:.2f} MB (delta: {memory_delta:+.2f} MB)")
+                
+            except Exception as cleanup_error:
+                logger.error(f"Error during pipeline manager cleanup: {cleanup_error}")
 
     def _calculate_optimal_batch_size(self, total_articles: int) -> int:
         """
@@ -374,29 +413,59 @@ class PipelineManager:
         Returns:
             Dictionary containing sub-batch processing results
         """
+        import gc
+        
         results = []
         successful = 0
         failed = 0
-
-        # Create asyncio tasks for all articles in this sub-batch
         tasks = []
-        for article_data in sub_batch:
-            task = asyncio.create_task(
-                self.process_article(article_data, date),
-                name=f"article_{article_data.id}",
-            )
-            tasks.append(task)
 
-        # Wait for all tasks in this sub-batch to complete
         try:
-            # Use asyncio.gather to wait for all tasks with return_exceptions=True
-            # to handle individual task failures gracefully
-            task_results = await asyncio.gather(*tasks, return_exceptions=True)
+            # Create asyncio tasks for all articles in this sub-batch
+            for article_data in sub_batch:
+                task = asyncio.create_task(
+                    self.process_article(article_data, date),
+                    name=f"article_{article_data.id}",
+                )
+                tasks.append(task)
 
-            for i, result in enumerate(task_results):
-                if isinstance(result, Exception):
-                    # Handle task exceptions
-                    logger.error(f"Task failed in sub-batch {batch_idx}: {result}")
+            # Wait for all tasks in this sub-batch to complete
+            try:
+                # Use asyncio.gather to wait for all tasks with return_exceptions=True
+                # to handle individual task failures gracefully
+                task_results = await asyncio.gather(*tasks, return_exceptions=True)
+
+                for i, result in enumerate(task_results):
+                    if isinstance(result, Exception):
+                        # Handle task exceptions
+                        logger.error(f"Task failed in sub-batch {batch_idx}: {result}")
+                        failed += 1
+                        results.append(
+                            {
+                                "article_id": sub_batch[i].id
+                                if i < len(sub_batch)
+                                else "unknown",
+                                "status": "failed",
+                                "processing_time": 0,
+                                "processing_steps": [],
+                                "enriched_data": None,
+                                "errors": [str(result)],
+                                "timestamp": datetime.utcnow().isoformat(),
+                            }
+                        )
+                    else:
+                        # Handle successful results
+                        results.append(result)
+                        if result["status"] == "completed":
+                            successful += 1
+                        else:
+                            failed += 1
+
+            except Exception as e:
+                # Handle any unexpected errors in the gather operation
+                logger.error(f"Unexpected error in sub-batch {batch_idx}: {e}")
+                # Mark all remaining tasks as failed
+                for i in range(len(results), len(sub_batch)):
                     failed += 1
                     results.append(
                         {
@@ -407,37 +476,31 @@ class PipelineManager:
                             "processing_time": 0,
                             "processing_steps": [],
                             "enriched_data": None,
-                            "errors": [str(result)],
+                            "errors": [str(e)],
                             "timestamp": datetime.utcnow().isoformat(),
                         }
                     )
-                else:
-                    # Handle successful results
-                    results.append(result)
-                    if result["status"] == "completed":
-                        successful += 1
-                    else:
-                        failed += 1
 
-        except Exception as e:
-            # Handle any unexpected errors in the gather operation
-            logger.error(f"Unexpected error in sub-batch {batch_idx}: {e}")
-            # Mark all remaining tasks as failed
-            for i in range(len(results), len(sub_batch)):
-                failed += 1
-                results.append(
-                    {
-                        "article_id": sub_batch[i].id
-                        if i < len(sub_batch)
-                        else "unknown",
-                        "status": "failed",
-                        "processing_time": 0,
-                        "processing_steps": [],
-                        "enriched_data": None,
-                        "errors": [str(e)],
-                        "timestamp": datetime.utcnow().isoformat(),
-                    }
-                )
+        finally:
+            # Ensure all tasks are properly cancelled and cleaned up
+            try:
+                # Cancel any remaining tasks
+                for task in tasks:
+                    if not task.done():
+                        task.cancel()
+                        try:
+                            await task
+                        except asyncio.CancelledError:
+                            pass
+                
+                # Clear task references
+                tasks.clear()
+                
+                # Force garbage collection after each sub-batch
+                gc.collect()
+                
+            except Exception as cleanup_error:
+                logger.error(f"Error during sub-batch cleanup: {cleanup_error}")
 
         return {"successful": successful, "failed": failed, "results": results}
 
@@ -829,6 +892,31 @@ class PipelineManager:
         await db_connection.disconnect()
 
         logger.info("Pipeline manager shutdown completed")
+    
+    async def cleanup_resources(self):
+        """Clean up all resources and force memory cleanup."""
+        import gc
+        
+        try:
+            logger.info("Starting comprehensive resource cleanup")
+            
+            # Clean up database connections
+            await db_connection.cleanup_connections()
+            
+            # Clear any cached data in processing modules
+            if hasattr(self, 'news_content_extractor'):
+                # Clear any cached data in extractors
+                pass
+            
+            # Force garbage collection multiple times
+            for i in range(3):
+                collected = gc.collect()
+                logger.debug(f"GC cycle {i+1}: collected {collected} objects")
+            
+            logger.info("Resource cleanup completed")
+            
+        except Exception as e:
+            logger.error(f"Error during resource cleanup: {e}")
 
 
 # Global pipeline manager instance

@@ -137,6 +137,34 @@ class DatabaseClientAndPool:
 
         except Exception as e:
             self.logger.error(f"Error closing database connections: {e}")
+    
+    async def cleanup_connections(self):
+        """Clean up any stale connections and force garbage collection."""
+        import gc
+        
+        try:
+            # Force close any remaining connections
+            if self.pool:
+                # Get current pool size
+                current_size = self.pool.get_size()
+                if current_size > 0:
+                    self.logger.info(f"Cleaning up {current_size} database connections")
+                
+                # Close the pool
+                await self.pool.close()
+                self.pool = None
+            
+            # Clear client
+            if self.client:
+                self.client = None
+            
+            # Force garbage collection
+            gc.collect()
+            
+            self.logger.info("Database connection cleanup completed")
+            
+        except Exception as e:
+            self.logger.error(f"Error during database connection cleanup: {e}")
 
     async def fetch_feed_entries(self, date: str) -> List[Dict[str, Any]]:
         """
