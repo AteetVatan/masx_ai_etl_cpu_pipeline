@@ -494,7 +494,7 @@ class PipelineManager:
         """Scrape article content with fallback."""
         try:
             title = extracted.title
-            text = extracted.content[:500]
+            text = extracted.content[:100]
 
             sentences = self.nlp_utils.split_sentences(text)
             # take random 5 sentences
