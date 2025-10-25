@@ -413,6 +413,24 @@ async def process_batch_articles():
         # Process feed entries by articles IDs
         feed_processor.set_date(validated_date)       
 
+        # Fire-and-forget mode for MASX AI trigger
+        if trigger == "masxai":
+            run_background_task(
+                feed_processor.process_articles_batch, articles_ids
+            )
+            logger.info(
+                f"MASX AI background job started for {validated_date} and articles {articles_ids}"
+            )
+            return jsonify(
+                {
+                    "status": "started",
+                    "message": f"MASX AI background processing initiated for {validated_date}",
+                    "date": validated_date,
+                    "articles_ids": articles_ids,
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
+            )
+
         result = await feed_processor.process_articles_batch(
             articles_ids
         )
