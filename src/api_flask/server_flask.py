@@ -385,7 +385,7 @@ async def process_batch_articles():
     }
     """
     try:
-        # Parse request data
+        # Parse request data , get date and articles_ids
         data = request.get_json() or {}
         date = data.get("date","")
         
