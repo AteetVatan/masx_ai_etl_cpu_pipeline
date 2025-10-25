@@ -50,7 +50,7 @@ class PipelineManager:
     def __init__(self):
         """Initialize the pipeline manager."""
         self.db_batch_size = settings.db_batch_size
-        self.max_workers = settings.max_workers
+        self.max_scrapers = settings.max_scrapers
         self.retry_attempts = settings.retry_attempts
         self.retry_delay = settings.retry_delay
 
@@ -317,13 +317,13 @@ class PipelineManager:
         """
         # Base batch size on available CPU cores and thread pool capacity
 
-        return self.max_workers
+        return self.max_scrapers
 
         cpu_cores = os.cpu_count() or 4
-        max_workers = self.max_workers
+        max_scrapers = self.max_scrapers
 
         # Calculate base batch size (2-3x the number of workers for good throughput)
-        base_batch_size = max_workers * 2
+        base_batch_size = max_scrapers * 2
 
         batch_size = 6
 

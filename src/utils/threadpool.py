@@ -63,7 +63,7 @@ class DynamicThreadPool:
         Args:
             max_workers: Maximum number of workers (defaults to CPU-based calculation)
         """
-        self.max_workers = max_workers or settings.max_workers
+        self.max_workers = max_workers or settings.max_scrapers
         self.min_workers = 1
         self.current_workers = self.min_workers
 
@@ -118,7 +118,7 @@ class DynamicThreadPool:
 
     def _should_scale_up(self) -> bool:
         """Determine if we should scale up the number of workers."""
-        if self.current_workers >= self.max_workers:
+        if self.current_workers >= self.max_scrapers:
             return False
 
         if time.time() - self._last_scale_time < self._scale_cooldown:

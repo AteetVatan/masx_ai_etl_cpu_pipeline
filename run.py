@@ -26,7 +26,7 @@ def print_startup_info():
     print(f"Port: {settings.port}")
     print(f"Debug: {settings.debug}")
     print(f"Log Level: {settings.log_level}")
-    print(f"Max Workers: {settings.max_workers}")
+    print(f"Max Workers: {settings.max_scrapers}")
     print(f"DB Batch Size: {settings.db_batch_size}")
     print(f"Image Search: {settings.enable_image_search}")
     print(f"Geotagging: {settings.enable_geotagging}")

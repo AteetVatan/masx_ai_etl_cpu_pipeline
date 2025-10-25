@@ -21,7 +21,7 @@ class TestPipelineManager:
     def test_init(self, pipeline_manager):
         """Test pipeline manager initialization."""
         assert pipeline_manager.batch_size == 100  # Default batch size
-        assert pipeline_manager.max_workers == 32  # Default max workers
+        assert pipeline_manager.max_scrapers == 32  # Default max workers
         assert pipeline_manager.retry_attempts == 3  # Default retries
         assert pipeline_manager.retry_delay == 1.0  # Default delay
         assert pipeline_manager.stats["total_processed"] == 0
