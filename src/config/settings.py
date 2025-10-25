@@ -28,6 +28,10 @@ class Settings(BaseSettings):
         description="Maximum number of scrapers to use",
     )
     
+    db_batch_size: int = Field(
+        default=100, description="Batch size for DB operation"
+    )
+    
     # Server Configuration
     api_key: str = Field(default="", description="API key")
     require_api_key: bool = Field(
