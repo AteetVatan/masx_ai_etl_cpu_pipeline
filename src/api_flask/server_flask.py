@@ -384,18 +384,6 @@ async def process_batch_articles():
         "trigger": "masxai"  # Optional, for background processing
     }
     """
-    import gc
-    import psutil
-    import os
-    
-    # Memory monitoring
-    process = psutil.Process(os.getpid())
-    initial_memory = process.memory_info().rss / 1024 / 1024  # MB
-    logger.info(f"Memory before processing: {initial_memory:.2f} MB")
-    
-    feed_processor = None
-    result = None
-    
     try:
         # Parse request data
         data = request.get_json() or {}
@@ -421,19 +409,13 @@ async def process_batch_articles():
         except ValueError as e:
             return jsonify({"detail": str(e)}), 400
 
+
         # Process feed entries by articles IDs
         feed_processor.set_date(validated_date)       
 
         result = await feed_processor.process_articles_batch(
             articles_ids
         )
-        
-        # Memory cleanup after processing
-        gc.collect()
-        final_memory = process.memory_info().rss / 1024 / 1024  # MB
-        memory_delta = final_memory - initial_memory
-        logger.info(f"Memory after processing: {final_memory:.2f} MB (delta: {memory_delta:+.2f} MB)")
-        
         return jsonify(result)
 
     except DatabaseError as e:
@@ -442,22 +424,6 @@ async def process_batch_articles():
     except Exception as e:
         logger.error(f"Unexpected error during processing: {e}")
         return jsonify({"detail": f"Processing failed: {str(e)}"}), 500
-    finally:
-        # Ensure cleanup even if exceptions occur
-        try:
-            if feed_processor:
-                # Clear feed entries from memory to prevent accumulation
-                feed_processor.clear_feed_entries(date if 'date' in locals() else None)
-            
-            # Force garbage collection
-            gc.collect()
-            
-            # Log final memory state
-            final_memory = process.memory_info().rss / 1024 / 1024  # MB
-            logger.info(f"Memory after cleanup: {final_memory:.2f} MB")
-            
-        except Exception as cleanup_error:
-            logger.error(f"Error during cleanup: {cleanup_error}")
     
         
 
@@ -528,75 +494,6 @@ async def process_feed_entries_by_article_id():
 def readiness_check():
     """Instant readiness endpoint for health probes."""
     return jsonify({"status": "ready", "uptime": "OK"})
-
-
-@app.route("/memory", methods=["GET"])
-def memory_status():
-    """Get current memory usage and statistics."""
-    try:
-        import psutil
-        import os
-        import gc
-        
-        process = psutil.Process(os.getpid())
-        memory_info = process.memory_info()
-        system_memory = psutil.virtual_memory()
-        
-        return jsonify({
-            "process_memory": {
-                "rss_mb": round(memory_info.rss / 1024 / 1024, 2),
-                "vms_mb": round(memory_info.vms / 1024 / 1024, 2),
-                "percent": round(process.memory_percent(), 2),
-                "num_threads": process.num_threads()
-            },
-            "system_memory": {
-                "total_mb": round(system_memory.total / 1024 / 1024, 2),
-                "available_mb": round(system_memory.available / 1024 / 1024, 2),
-                "percent": round(system_memory.percent, 2),
-                "used_mb": round(system_memory.used / 1024 / 1024, 2)
-            },
-            "gc_stats": {
-                "counts": gc.get_count(),
-                "thresholds": gc.get_threshold()
-            },
-            "timestamp": datetime.utcnow().isoformat()
-        })
-        
-    except Exception as e:
-        logger.error(f"Error getting memory status: {e}")
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route("/memory/cleanup", methods=["POST"])
-def force_memory_cleanup():
-    """Force memory cleanup and garbage collection."""
-    try:
-        import gc
-        import psutil
-        import os
-        
-        process = psutil.Process(os.getpid())
-        initial_memory = process.memory_info().rss / 1024 / 1024
-        
-        # Force garbage collection multiple times
-        for i in range(3):
-            collected = gc.collect()
-            logger.info(f"GC cycle {i+1}: collected {collected} objects")
-        
-        final_memory = process.memory_info().rss / 1024 / 1024
-        memory_freed = initial_memory - final_memory
-        
-        return jsonify({
-            "status": "success",
-            "memory_freed_mb": round(memory_freed, 2),
-            "initial_memory_mb": round(initial_memory, 2),
-            "final_memory_mb": round(final_memory, 2),
-            "timestamp": datetime.utcnow().isoformat()
-        })
-        
-    except Exception as e:
-        logger.error(f"Error during memory cleanup: {e}")
-        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":

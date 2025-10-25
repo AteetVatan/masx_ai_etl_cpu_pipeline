@@ -289,18 +289,7 @@ class FeedProcessor:
         Raises:
             ValueError: If date format is invalid
         """
-        import gc
-        import psutil
-        import os
-        
-        # Memory monitoring
-        process = psutil.Process(os.getpid())
-        initial_memory = process.memory_info().rss / 1024 / 1024  # MB
-        logger.info(f"Feed processor memory before batch: {initial_memory:.2f} MB")
-        
-        feed_entries = None
-        results = None
-        
+
         try:
             logger.info(
                 f"Processing feed entries for date: {self.date}, length of articles: {len(articles_ids)}"
@@ -318,20 +307,19 @@ class FeedProcessor:
                     "timestamp": datetime.utcnow().isoformat(),
                 }
 
+            #proxy_service = ProxyService.get_instance()
+            #await proxy_service.ping_start_proxy()
+            #proxies = await proxy_service.get_proxy_cache(force_refresh=True)
             # Process filtered entries
             results = await self.process_feed_entries_batch(feed_entries)
+
+            #await proxy_service.ping_stop_proxy()
 
             # Update statistics
             self.processing_stats["total_processed"] = 1
             self.processing_stats["successful"] += results["successful"]
             self.processing_stats["failed"] += results["failed"]
             self.processing_stats["last_processed_date"] = self.date
-
-            # Memory cleanup
-            gc.collect()
-            final_memory = process.memory_info().rss / 1024 / 1024  # MB
-            memory_delta = final_memory - initial_memory
-            logger.info(f"Feed processor memory after batch: {final_memory:.2f} MB (delta: {memory_delta:+.2f} MB)")
 
             return {
                 "status": "completed",
@@ -360,28 +348,7 @@ class FeedProcessor:
                 "error": str(e),
                 "message": "Unexpected error during processing",
                 "timestamp": datetime.utcnow().isoformat(),
-            }
-        finally:
-            # Ensure cleanup of large data structures
-            try:
-                if feed_entries:
-                    # Clear the feed entries list to free memory
-                    feed_entries.clear()
-                    del feed_entries
-                
-                # Clear any cached data in the processor
-                if hasattr(self, 'all_feed_entries') and self.date in self.all_feed_entries:
-                    del self.all_feed_entries[self.date]
-                
-                # Force garbage collection
-                gc.collect()
-                
-                # Log final memory state
-                final_memory = process.memory_info().rss / 1024 / 1024  # MB
-                logger.info(f"Feed processor memory after cleanup: {final_memory:.2f} MB")
-                
-            except Exception as cleanup_error:
-                logger.error(f"Error during feed processor cleanup: {cleanup_error}")         
+            }         
             
     async def process_by_article_id(
         self, flashpoint_id: str, article_id: str
