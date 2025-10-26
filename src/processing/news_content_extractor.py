@@ -58,7 +58,6 @@ class NewsContentExtractor:
             # proxies = await ProxyManager.proxies_async()
 
             proxies = await self.proxy_service.get_proxy_cache()
-            
 
             self.logger.info(
                 f"news_content_extractor.py:NewsContentExtractor:---- {len(proxies)} proxies found ----"
@@ -124,23 +123,26 @@ class NewsContentExtractor:
             self.logger.info(
                 f"NewsContentExtractor:[Fallback] Invoking Crawl4AI for: {url[:50]}..."
             )
-            try:                
+            try:
                 # first try quick crawl4ai scrape
                 try:
-                    crawl_result: ExtractResult = await self.crawl4AIExtractor.crawl4ai_scrape(url)                    
+                    crawl_result: ExtractResult = (
+                        await self.crawl4AIExtractor.crawl4ai_scrape(url)
+                    )
                 except Exception as e:
-                    self.logger.error(f"NewsContentExtractor:Normal Crawl4AI scraping failed for {url[:50]}...: {e}")
-                    
+                    self.logger.error(
+                        f"NewsContentExtractor:Normal Crawl4AI scraping failed for {url[:50]}...: {e}"
+                    )
+
                 # if not successful, try with proxy and retry with longer timeout
                 if not crawl_result and len(proxies) > 0:
                     proxy = choice(proxies)
-                    crawl_result: ExtractResult = (
-                        await self.crawl4AIExtractor.crawl4ai_scrape_with_retry_and_proxy(url, proxies)
+                    crawl_result: ExtractResult = await self.crawl4AIExtractor.crawl4ai_scrape_with_retry_and_proxy(
+                        url, proxies
                     )
                     if crawl_result and crawl_result.word_count < 2000:
                         crawl_result = None
-                        
-                        
+
                 if not crawl_result:  # sanity check
                     raise ValueError("Crawl4AI returned empty or too short content.")
 

@@ -364,7 +364,6 @@ async def process_feed_entries_by_flashpoint():
     except Exception as e:
         logger.error(f"Unexpected error during processing: {e}")
         return jsonify({"detail": f"Processing failed: {str(e)}"}), 500
-    
 
 
 @app.route("/feed/process/batch_articles", methods=["POST"])
@@ -387,37 +386,36 @@ async def process_batch_articles():
     try:
         # Parse request data , get date and articles_ids
         data = request.get_json() or {}
-        date = data.get("date","")
-        
-        articles_ids = data.get("articles_ids",[])
-      
+        date = data.get("date", "")
+
+        articles_ids = data.get("articles_ids", [])
+
         trigger = data.get("trigger")
-        logger.info(f"Processing feed entries for date: {date}, length of articles: {len(articles_ids)}")
-        
-        feed_processor = get_feed_processor()       
-        
+        logger.info(
+            f"Processing feed entries for date: {date}, length of articles: {len(articles_ids)}"
+        )
+
+        feed_processor = get_feed_processor()
+
         # Validate date
         if not date:
             return jsonify({"detail": "date is required"}), 400
-        
+
         if len(articles_ids) == 0:
             return jsonify({"detail": "articles are required"}), 400
-        
+
         # Validate date format
         try:
             validated_date = validate_and_raise(date, "date")
         except ValueError as e:
             return jsonify({"detail": str(e)}), 400
 
-
         # Process feed entries by articles IDs
-        feed_processor.set_date(validated_date)       
+        feed_processor.set_date(validated_date)
 
         # Fire-and-forget mode for MASX AI trigger
         if trigger == "masxai":
-            run_background_task(
-                feed_processor.process_articles_batch, articles_ids
-            )
+            run_background_task(feed_processor.process_articles_batch, articles_ids)
             logger.info(
                 f"MASX AI background job started for {validated_date} and articles {articles_ids}"
             )
@@ -431,9 +429,7 @@ async def process_batch_articles():
                 }
             )
 
-        result = await feed_processor.process_articles_batch(
-            articles_ids
-        )
+        result = await feed_processor.process_articles_batch(articles_ids)
         return jsonify(result)
 
     except DatabaseError as e:
@@ -442,8 +438,7 @@ async def process_batch_articles():
     except Exception as e:
         logger.error(f"Unexpected error during processing: {e}")
         return jsonify({"detail": f"Processing failed: {str(e)}"}), 500
-    
-        
+
 
 @app.route("/feed/process/article", methods=["POST"])
 @async_route
@@ -470,14 +465,16 @@ async def process_feed_entries_by_article_id():
         flashpoint_id = data.get("flashpoint_id")
         article_id = data.get("article_id")
         trigger = data.get("trigger")
-        logger.info(f"Processing feed entries for date: {date}, flashpoint_id: {flashpoint_id}, article_id: {article_id}")
-        
-        feed_processor = get_feed_processor()       
-        
+        logger.info(
+            f"Processing feed entries for date: {date}, flashpoint_id: {flashpoint_id}, article_id: {article_id}"
+        )
+
+        feed_processor = get_feed_processor()
+
         # Validate date
         if not date:
             return jsonify({"detail": "date is required"}), 400
-        
+
         # Validate date format
         try:
             validated_date = validate_and_raise(date, "date")
@@ -487,17 +484,15 @@ async def process_feed_entries_by_article_id():
         # Validate flashpoint_id
         if not flashpoint_id:
             return jsonify({"detail": "flashpoint_id is required"}), 400
-        
+
         # Validate article_id
         if not article_id:
             return jsonify({"detail": "article_id is required"}), 400
 
         # Process feed entries by flashpoint ID
-        feed_processor.set_date(validated_date)       
+        feed_processor.set_date(validated_date)
 
-        result = await feed_processor.process_by_article_id(
-            flashpoint_id, article_id
-        )
+        result = await feed_processor.process_by_article_id(flashpoint_id, article_id)
         return jsonify(result)
 
     except DatabaseError as e:

@@ -141,17 +141,17 @@ class FeedProcessor:
             # Process all entries
             results = {"successful": 0, "failed": 0, "processing_time": 0}
 
-            #proxy_service = ProxyService.get_instance()
-            #await proxy_service.ping_start_proxy()
+            # proxy_service = ProxyService.get_instance()
+            # await proxy_service.ping_start_proxy()
             # await proxy_service.start_proxy_refresher()
-            #proxies = await proxy_service.get_proxy_cache()
+            # proxies = await proxy_service.get_proxy_cache()
 
             if batch_mode:
                 results = await self.process_feed_entries_batch(feed_entries)
             else:
                 results = await self._process_feed_entries(feed_entries)
 
-            #await proxy_service.ping_stop_proxy()
+            # await proxy_service.ping_stop_proxy()
 
             # Update statistics
             self.processing_stats["total_processed"] += len(feed_entries)
@@ -223,15 +223,15 @@ class FeedProcessor:
                     "timestamp": datetime.utcnow().isoformat(),
                 }
 
-            #proxy_service = ProxyService.get_instance()
-            #await proxy_service.ping_start_proxy()
+            # proxy_service = ProxyService.get_instance()
+            # await proxy_service.ping_start_proxy()
             # await proxy_service.start_proxy_refresher()
-            #proxies = await proxy_service.get_proxy_cache()
+            # proxies = await proxy_service.get_proxy_cache()
 
             # Process filtered entries
             results = await self._process_feed_entries(feed_entries)
 
-            #await proxy_service.ping_stop_proxy()
+            # await proxy_service.ping_stop_proxy()
 
             # Update statistics
             self.processing_stats["total_processed"] += len(feed_entries)
@@ -271,11 +271,8 @@ class FeedProcessor:
                 "message": "Unexpected error during processing",
                 "timestamp": datetime.utcnow().isoformat(),
             }
-            
-            
-    async def process_articles_batch(
-        self, articles_ids: List[str]
-        ) -> Dict[str, Any]:
+
+    async def process_articles_batch(self, articles_ids: List[str]) -> Dict[str, Any]:
         """
         Process feed entries for a specific date and article_id.
 
@@ -307,13 +304,13 @@ class FeedProcessor:
                     "timestamp": datetime.utcnow().isoformat(),
                 }
 
-            #proxy_service = ProxyService.get_instance()
-            #await proxy_service.ping_start_proxy()
-            #proxies = await proxy_service.get_proxy_cache(force_refresh=True)
+            # proxy_service = ProxyService.get_instance()
+            # await proxy_service.ping_start_proxy()
+            # proxies = await proxy_service.get_proxy_cache(force_refresh=True)
             # Process filtered entries
             results = await self.process_feed_entries_batch(feed_entries)
 
-            #await proxy_service.ping_stop_proxy()
+            # await proxy_service.ping_stop_proxy()
 
             # Update statistics
             self.processing_stats["total_processed"] = 1
@@ -348,11 +345,11 @@ class FeedProcessor:
                 "error": str(e),
                 "message": "Unexpected error during processing",
                 "timestamp": datetime.utcnow().isoformat(),
-            }         
-            
+            }
+
     async def process_by_article_id(
         self, flashpoint_id: str, article_id: str
-        ) -> Dict[str, Any]:
+    ) -> Dict[str, Any]:
         """
         Process feed entries for a specific date and article_id.
 
@@ -373,7 +370,9 @@ class FeedProcessor:
             )
 
             # Load feed entries filtered by flashpoint_id
-            feed_entry = await self._load_feed_entry_by_article_id(flashpoint_id, article_id)
+            feed_entry = await self._load_feed_entry_by_article_id(
+                flashpoint_id, article_id
+            )
 
             if not feed_entry:
                 return {
@@ -386,12 +385,12 @@ class FeedProcessor:
                 }
 
             proxy_service = ProxyService.get_instance()
-            #await proxy_service.ping_start_proxy()
+            # await proxy_service.ping_start_proxy()
 
             # Process filtered entries
             results = await self._process_feed_entries(feed_entry)
 
-            #await proxy_service.ping_stop_proxy()
+            # await proxy_service.ping_stop_proxy()
 
             # Update statistics
             self.processing_stats["total_processed"] = 1
@@ -442,7 +441,7 @@ class FeedProcessor:
         return await db_connection.fetch_feed_entries_by_flashpoint_id(
             self.date, flashpoint_id
         )
-   
+
     async def _load_feed_entries_by_articles_ids(
         self, article_ids: list[str]
     ) -> List[Dict[str, Any]]:
@@ -450,8 +449,7 @@ class FeedProcessor:
         return await db_connection.fetch_feed_entries_by_article_ids(
             self.date, article_ids
         )
-   
-        
+
     async def _load_feed_entry_by_article_id(
         self, flashpoint_id: str, article_id: str
     ) -> List[Dict[str, Any]]:

@@ -99,7 +99,7 @@ class Crawl4AIExtractor:
         timeout_sec: int = 60000,  # maximum 1 minute
     ) -> ExtractResult:
         from src.scraping import WebScraperUtils
-       
+
         try:
             config = c4a_configs.get_crawl4ai_config()
             async with AsyncWebCrawler() as crawler:
@@ -136,10 +136,8 @@ class Crawl4AIExtractor:
                 f"crawl4AI_extractor.py:Crawl4AIExtractor: timed out after {timeout_sec}s"
             )
         except Exception as e:
-            self.logger.error(
-                f"crawl4AI_extractor.py:Crawl4AIExtractor: failed : {e}"
-            )
-      
+            self.logger.error(f"crawl4AI_extractor.py:Crawl4AIExtractor: failed : {e}")
+
         return None
 
     async def crawl4ai_scrape_with_retry_and_proxy(
@@ -150,11 +148,11 @@ class Crawl4AIExtractor:
         timeout_sec: int = 60000,  # maximum 1 minute
     ) -> ExtractResult:
         from src.scraping import WebScraperUtils
-        #proxies = await self.proxy_service.validate_proxies(proxies)
-        #browser_configs = c4a_configs.get_browser_presets()
+
+        # proxies = await self.proxy_service.validate_proxies(proxies)
+        # browser_configs = c4a_configs.get_browser_presets()
         config = c4a_configs.get_crawl4ai_config(proxies)
-        
-            
+
         for attempt in range(1, retries + 1):
             try:
                 async with AsyncWebCrawler() as crawler:
@@ -202,14 +200,12 @@ class Crawl4AIExtractor:
 
         # after last attempt
         if attempt < retries:
-            await asyncio.sleep(2**(attempt-1))  # exponential back-off
+            await asyncio.sleep(2 ** (attempt - 1))  # exponential back-off
 
         self.logger.error(
             f"crawl4AI_extractor.py:Crawl4AIExtractor:All {retries} crawl attempts failed"
         )
         return None
-    
-    
 
     async def trafilatura_from_html(self, html: str, url: str) -> ExtractResult:
         try:

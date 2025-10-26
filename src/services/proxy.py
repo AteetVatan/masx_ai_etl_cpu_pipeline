@@ -129,12 +129,13 @@ class ProxyService:
     async def get_proxy_cache(self, force_refresh: bool = False) -> List[str]:
         """Get the proxy cache, refreshing if expired."""
         if not self._proxy_cache or force_refresh:
-            self._proxy_cache = await self.__get_proxies()           
+            self._proxy_cache = await self.__get_proxies()
 
-        return self._proxy_cache 
-    
+        return self._proxy_cache
+
     async def validate_proxies(self, proxies: List[str]) -> List[str]:
         """Validate the proxies concurrently using multithreading."""
+
         def check_proxy(proxy: str) -> str | None:
             """Runs in threadpool: validates a single proxy."""
             try:
@@ -155,16 +156,18 @@ class ProxyService:
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
             # Map each proxy to a future
-            tasks = [loop.run_in_executor(executor, check_proxy, proxy) for proxy in proxies]
+            tasks = [
+                loop.run_in_executor(executor, check_proxy, proxy) for proxy in proxies
+            ]
             for f in asyncio.as_completed(tasks):
                 result = await f
                 if result:
                     valid_proxies.append(result)
 
-        self.logger.info(f"✅ Validated {len(valid_proxies)} proxies out of {len(proxies)}")
+        self.logger.info(
+            f"✅ Validated {len(valid_proxies)} proxies out of {len(proxies)}"
+        )
         return valid_proxies
-
-    
 
     async def _refresh(self):
         """Internal refresh method (safe)."""
@@ -277,7 +280,7 @@ class ProxyService:
             error_msg = f"Unexpected error during proxy start operation: {str(e)}"
             self.logger.error(error_msg)
             raise ServiceException(error_msg)
-        
+
     async def ping_stop_proxy(self) -> ProxyStartResponse:
         await self.stop_proxy_refresher()
 
@@ -286,6 +289,7 @@ class ProxyService:
         Retrieve list of available proxies from the proxy service.
         Retries once automatically if no proxies are returned.
         """
+
         async def fetch_proxies_once(attempt: int = 1) -> List[str]:
             try:
                 self.logger.info(f"Retrieving proxy list (attempt {attempt})...")
@@ -304,11 +308,17 @@ class ProxyService:
                     ) as response:
                         if response.status != 200:
                             if response.status == 401:
-                                raise ServiceException("Unauthorized - Invalid proxy API key")
+                                raise ServiceException(
+                                    "Unauthorized - Invalid proxy API key"
+                                )
                             if response.status == 429:
-                                raise ServiceException("Rate limited - Too many requests to proxy service")
+                                raise ServiceException(
+                                    "Rate limited - Too many requests to proxy service"
+                                )
                             error_data = await response.text()
-                            raise ServiceException(f"Proxy retrieval failed: {response.status} {error_data}")
+                            raise ServiceException(
+                                f"Proxy retrieval failed: {response.status} {error_data}"
+                            )
 
                         data = await response.json()
                         proxy_response = ProxyListResponse(
@@ -318,40 +328,51 @@ class ProxyService:
                         )
 
                         if not proxy_response.success:
-                            raise ServiceException(f"Proxy service error: {proxy_response.message}")
+                            raise ServiceException(
+                                f"Proxy service error: {proxy_response.message}"
+                            )
 
                         proxy_count = len(proxy_response.data)
-                        self.logger.info(f"Retrieved {proxy_count} proxies: {proxy_response.message}")
+                        self.logger.info(
+                            f"Retrieved {proxy_count} proxies: {proxy_response.message}"
+                        )
 
                         if not proxy_response.data:
                             self.logger.warning("No proxies returned from service")
                             return []
 
                         # Validate proxies
-                        #proxy_data = await self.validate_proxies(proxy_response.data)
+                        # proxy_data = await self.validate_proxies(proxy_response.data)
                         self._proxy_cache = proxy_response.data
                         return proxy_response.data
 
             except (aiohttp.ClientError, asyncio.TimeoutError) as e:
-                raise ServiceException(f"Network or timeout error during proxy retrieval: {str(e)}")
+                raise ServiceException(
+                    f"Network or timeout error during proxy retrieval: {str(e)}"
+                )
             except Exception as e:
-                raise ServiceException(f"Unexpected error during proxy retrieval: {str(e)}")
+                raise ServiceException(
+                    f"Unexpected error during proxy retrieval: {str(e)}"
+                )
 
         # --- Main Logic with Retry ---
         proxies = await fetch_proxies_once(attempt=1)
 
         if not proxies:
-            self.logger.warning("No valid proxies found — retrying once after 2 seconds...")
+            self.logger.warning(
+                "No valid proxies found — retrying once after 2 seconds..."
+            )
             await asyncio.sleep(2)
             proxies = await fetch_proxies_once(attempt=2)
 
             if not proxies:
-                self.logger.error("Retry failed — no proxies available after second attempt.")
+                self.logger.error(
+                    "Retry failed — no proxies available after second attempt."
+                )
             else:
                 self.logger.info(f"Retry succeeded — retrieved {len(proxies)} proxies.")
 
         return proxies
-
 
     async def health_check(self) -> bool:
         """

@@ -22,16 +22,14 @@ class Settings(BaseSettings):
     process_articles_limit: int = Field(
         default=0, description="Number of articles to process"
     )
-    # Pipeline Configuration  
+    # Pipeline Configuration
     max_scrapers: int = Field(
         default=1,
         description="Maximum number of scrapers to use",
     )
-    
-    db_batch_size: int = Field(
-        default=100, description="Batch size for DB operation"
-    )
-    
+
+    db_batch_size: int = Field(default=100, description="Batch size for DB operation")
+
     # Server Configuration
     api_key: str = Field(default="", description="API key")
     require_api_key: bool = Field(

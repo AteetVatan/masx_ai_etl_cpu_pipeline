@@ -162,19 +162,22 @@ class DatabaseClientAndPool:
             table_name = format_date_for_table(date)
 
             # Try to fetch all entries from the table
-            # If table doesn't exist, Supabase will return an error            
-            #result = self.client.schema("public").table(table_name).select("*").execute()           
-            
+            # If table doesn't exist, Supabase will return an error
+            # result = self.client.schema("public").table(table_name).select("*").execute()
+
             batch_size = 1000
             offset = 0
             all_rows = []
 
             while True:
-                res = self.client.schema("public").table(table_name)\
-                    .select("*")\
-                    .range(offset, offset + batch_size - 1)\
+                res = (
+                    self.client.schema("public")
+                    .table(table_name)
+                    .select("*")
+                    .range(offset, offset + batch_size - 1)
                     .execute()
-                
+                )
+
                 if not res.data:
                     break
 
@@ -184,9 +187,7 @@ class DatabaseClientAndPool:
                 self.logger.warning(f"No feed entries found in table {table_name}")
                 return []
 
-            self.logger.info(
-                f"Fetched {len(all_rows)} feed entries from {table_name}"
-            )
+            self.logger.info(f"Fetched {len(all_rows)} feed entries from {table_name}")
             return all_rows
 
         except Exception as e:
@@ -262,8 +263,6 @@ class DatabaseClientAndPool:
                 raise DatabaseError(
                     f"Failed to fetch feed entries for date {date} and flashpoint_id {flashpoint_id}: {e}"
                 )
-                
-
 
     async def fetch_feed_entries_by_article_ids(
         self, date: str, article_ids: List[str]
@@ -291,16 +290,13 @@ class DatabaseClientAndPool:
 
         def chunk_list(lst, size):
             for i in range(0, len(lst), size):
-                yield lst[i:i + size]
+                yield lst[i : i + size]
 
         async def fetch_chunk(chunk: List[str]) -> List[Dict[str, Any]]:
             """Fetch a chunk safely (with retry on transient failure)."""
             try:
                 res = (
-                    self.client.table(table_name)
-                    .select("*")
-                    .in_("id", chunk)
-                    .execute()
+                    self.client.table(table_name).select("*").in_("id", chunk).execute()
                 )
                 return res.data or []
             except Exception as e:
@@ -319,7 +315,9 @@ class DatabaseClientAndPool:
                     return []
 
         try:
-            tasks = [fetch_chunk(chunk) for chunk in chunk_list(article_ids, chunk_size)]
+            tasks = [
+                fetch_chunk(chunk) for chunk in chunk_list(article_ids, chunk_size)
+            ]
             results = await asyncio.gather(*tasks)
 
             all_results = [item for sublist in results for item in sublist]
@@ -328,7 +326,9 @@ class DatabaseClientAndPool:
                 self.logger.warning(f"No feed entries found in {table_name}")
                 return []
 
-            self.logger.info(f"Fetched {len(all_results)} feed entries from {table_name}")
+            self.logger.info(
+                f"Fetched {len(all_results)} feed entries from {table_name}"
+            )
             return all_results
 
         except Exception as e:
@@ -338,8 +338,7 @@ class DatabaseClientAndPool:
             else:
                 self.logger.error(f"Failed to fetch feed entries for {date}: {e}")
                 raise DatabaseError(f"Failed to fetch feed entries for {date}: {e}")
-                            
-            
+
     async def fetch_feed_entries_by_article_id(
         self, date: str, flashpoint_id: str, article_id: str
     ) -> List[Dict[str, Any]]:
@@ -400,7 +399,7 @@ class DatabaseClientAndPool:
                 )
                 raise DatabaseError(
                     f"Failed to fetch feed entries for date {date} and flashpoint_id {flashpoint_id}: {e}"
-                )            
+                )
 
     async def fetch_articles_batch(
         self, limit: int = None, offset: int = 0, status: str = "pending"

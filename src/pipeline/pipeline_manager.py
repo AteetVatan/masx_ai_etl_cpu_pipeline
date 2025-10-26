@@ -103,7 +103,7 @@ class PipelineManager:
         start_time = time.time()
         processing_steps = []
         errors = []
-        extracted_data: ExtractResult = None       
+        extracted_data: ExtractResult = None
         try:
             extracted_data = ExtractResult()
             extracted_data.id = article_id
@@ -124,11 +124,11 @@ class PipelineManager:
             processing_steps.append("language_setting")
 
             # Step 3: Translate title
-            #logger.debug(
+            # logger.debug(
             #    f"Step 3: Translating title and language detection for article {article_id}"
-            #)
-            #extracted_data = await self._translate_title(extracted_data)
-            #processing_steps.append("translation")
+            # )
+            # extracted_data = await self._translate_title(extracted_data)
+            # processing_steps.append("translation")
 
             # Step 4: Metadata extraction
             logger.debug(f"Step 4: Extracting entities for article {article_id}")
@@ -141,9 +141,9 @@ class PipelineManager:
             processing_steps.append("geotagging")
 
             # Step 6: Find relevant images
-            #logger.debug(f"Step 6: Finding images for article {article_id}")
-            #extracted_data = await self._find_images(extracted_data)
-            #processing_steps.append("image_search")
+            # logger.debug(f"Step 6: Finding images for article {article_id}")
+            # extracted_data = await self._find_images(extracted_data)
+            # processing_steps.append("image_search")
 
             # Step 7: download images to supabase
             # if len(extracted_data.images) > 0:
@@ -454,7 +454,7 @@ class PipelineManager:
         except Exception as e:
             logger.error(f"Fallback scraper also failed for {extracted_data.url}: {e}")
             raise e
-    
+
     async def _scrape_article(self, extracted_data: ExtractResult) -> ExtractResult:
         """
         Scrape article content with retry and fallback.
@@ -462,18 +462,24 @@ class PipelineManager:
         Tries up to 2 times with a short delay between retries.
         """
         max_retries = 2
-        #delay_between_retries = 2  # seconds
+        # delay_between_retries = 2  # seconds
 
         for attempt in range(1, max_retries + 1):
             try:
-                logger.info(f"Scraping attempt {attempt}/{max_retries} for: {extracted_data.url}")
-                
-                result: ExtractResult = await self.news_content_extractor.extract_feed(extracted_data.url)
-                
+                logger.info(
+                    f"Scraping attempt {attempt}/{max_retries} for: {extracted_data.url}"
+                )
+
+                result: ExtractResult = await self.news_content_extractor.extract_feed(
+                    extracted_data.url
+                )
+
                 if not result or not getattr(result, "content", None):
                     raise Exception("Empty or invalid article content")
-                
-                logger.info(f"Successfully scraped {extracted_data.url} on attempt {attempt}")
+
+                logger.info(
+                    f"Successfully scraped {extracted_data.url} on attempt {attempt}"
+                )
                 return result
 
             except Exception as e:
@@ -483,12 +489,11 @@ class PipelineManager:
 
                 # Wait before retry if not the last attempt
                 if attempt < max_retries:
-                    #await asyncio.sleep(delay_between_retries)
+                    # await asyncio.sleep(delay_between_retries)
                     pass
                 else:
                     logger.error(f"All retries failed for {extracted_data.url}: {e}")
-                    raise e    
-    
+                    raise e
 
     async def _set_extracted_language(self, extracted: ExtractResult) -> ExtractResult:
         """Scrape article content with fallback."""
@@ -545,7 +550,7 @@ class PipelineManager:
         return scraped_data
 
     async def _translate_title(self, extracted_data: ExtractResult) -> ExtractResult:
-        """Translate title and language detection."""        
+        """Translate title and language detection."""
         if extracted_data.language == "en":
             extracted_data.title_en = extracted_data.title
         else:
@@ -555,7 +560,7 @@ class PipelineManager:
         title = extracted_data.title
         language = extracted_data.language
 
-        #proxies = await self.proxy_service.get_proxy_cache()
+        # proxies = await self.proxy_service.get_proxy_cache()
 
         title_en = await self.translation_manager.translate(
             title, source=language, target="en"
