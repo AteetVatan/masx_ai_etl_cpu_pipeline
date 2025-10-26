@@ -190,6 +190,8 @@ def root():
 async def health_check():
     """
     Comprehensive health check endpoint.
+    This will also be used for warmup
+    
 
     Returns the health status of all system components including
     database, thread pool, and processing modules.
