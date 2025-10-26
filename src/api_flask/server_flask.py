@@ -118,7 +118,7 @@ def run_background_task(func, *args, **kwargs):
         finally:
             loop.close()
 
-    thread = threading.Thread(target=background_worker, daemon=True)
+    thread = threading.Thread(target=background_worker, daemon=False)
     thread.start()
     return thread
 
