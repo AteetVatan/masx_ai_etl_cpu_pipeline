@@ -190,16 +190,29 @@ def root():
 async def health_check():
     """
     Comprehensive health check endpoint.
-    This will also be used for warmup
-    
-
-    Returns the health status of all system components including
-    database, thread pool, and processing modules.
+    Also generates outbound traffic to keep Railway awake.
     """
+    import aiohttp, time
     try:
         pipeline_manager = get_pipeline_manager()
         health_data = await pipeline_manager.health_check()
-        return jsonify(health_data)
+
+        # --- outbound ping to ensure Railway activity ---
+        ping_status = "skipped"
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get("https://1.1.1.1/", timeout=3) as resp:
+                    ping_status = f"ok ({resp.status})"
+        except Exception as e:
+            ping_status = f"failed ({type(e).__name__}: {e})"
+
+        health_data["outbound_ping"] = {
+            "status": ping_status,
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        }
+
+        return jsonify(health_data), 200
+
     except Exception as e:
         logger.error(f"Health check failed: {e}")
         return jsonify({"detail": f"Health check failed: {str(e)}"}), 500
