@@ -108,7 +108,7 @@ class FeedProcessor:
             }
 
     async def process_all_feed_entries(
-        self, feed_entries, batch_mode: bool = False
+        self, batch_mode: bool = False
     ) -> Dict[str, Any]:
         """
         Process all feed entries for a specific date.

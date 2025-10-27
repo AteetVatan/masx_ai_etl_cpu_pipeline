@@ -291,10 +291,6 @@ async def process_feed_entries():
                     "status": "started",
                     "message": f"MASX AI background processing initiated for {validated_date}",
                     "date": validated_date,
-                    "total_entries": 0,
-                    "successful": 0,
-                    "failed": 0,
-                    "processing_time": 0,
                     "timestamp": datetime.utcnow().isoformat(),
                 }
             )
