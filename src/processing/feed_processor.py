@@ -114,7 +114,7 @@ class FeedProcessor:
         Process all feed entries for a specific date.
 
         Args:
-            date: Date in YYYY-MM-DD format (e.g., "2025-07-02")
+            batch_mode: Batch mode (True or False)
 
         Returns:
             Dictionary containing processing results
