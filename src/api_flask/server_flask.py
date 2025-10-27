@@ -236,7 +236,7 @@ async def get_stats():
         return jsonify({"detail": f"Failed to get stats: {str(e)}"}), 500
 
 
-@app.route("/feed/process", methods=["POST"])
+@app.route("/feed/process/all", methods=["POST"])
 @async_route
 async def process_feed_entries():
     """
