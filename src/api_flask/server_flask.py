@@ -248,8 +248,8 @@ async def process_feed_entries():
 
     Request body:
     {
-        "date": "2024-01-01",  # Optional, defaults to today
-        "flashpoints": ["fp1", "fp2"],  # Optional
+        "date": "2024-01-01",  # Optional, defaults to today 
+        "batch_mode": "1" , # 0 for single mode, 1 for batch mode      
         "trigger": "masxai"  # Optional, for background processing
     }
     """
@@ -257,9 +257,15 @@ async def process_feed_entries():
         # Parse request data
         data = request.get_json() or {}
         date = data.get("date")
-        flashpoints = data.get("flashpoints")
-        trigger = data.get("trigger")
-
+        #flashpoints = data.get("flashpoints")
+        trigger = data.get("trigger", "")
+        batch_mode_attribute = data.get("batch_mode", "1")
+        
+        if batch_mode_attribute == "0":
+            batch_mode = False
+        else:
+            batch_mode = True
+        
         feed_processor = get_feed_processor()
 
         # Use today's date if not provided
@@ -277,7 +283,7 @@ async def process_feed_entries():
         # Fire-and-forget mode for MASX AI trigger
         if trigger == "masxai":
             run_background_task(
-                feed_processor.process_all_feed_entries, batch_mode=True
+                feed_processor.process_all_feed_entries, batch_mode=batch_mode
             )
             logger.info(f"MASX AI background job started for {validated_date}")
             return jsonify(
@@ -293,7 +299,7 @@ async def process_feed_entries():
                 }
             )
 
-        result = await feed_processor.process_all_feed_entries(batch_mode=True)
+        result = await feed_processor.process_all_feed_entries(batch_mode=batch_mode)
         return jsonify(result)
 
     except DatabaseError as e:

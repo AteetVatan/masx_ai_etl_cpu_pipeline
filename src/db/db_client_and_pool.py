@@ -202,6 +202,72 @@ class DatabaseClientAndPool:
                 raise DatabaseError(
                     f"Failed to fetch feed entries for date {date}: {e}"
                 )
+                
+    async def fetch_unprocessed_feed_entries(self, date: str) -> List[Dict[str, Any]]:
+        """
+        Fetch all feed entries for a specific date.
+
+        Args:
+            date: Date in YYYY-MM-DD format (e.g., "2025-07-02")
+
+        Returns:
+            List of feed entry dictionaries
+
+        Raises:
+            DatabaseError: If fetch operation fails
+            ValueError: If date format is invalid
+        """
+        if not self.client:
+            raise ConnectionError("Database client not connected")
+
+        # Validate date format
+        date = validate_and_raise(date, "date")
+
+        try:
+            table_name = format_date_for_table(date)
+
+            # Try to fetch all entries from the table
+            # If table doesn't exist, Supabase will return an error
+            # result = self.client.schema("public").table(table_name).select("*").execute()
+
+            batch_size = 1000
+            offset = 0
+            all_rows = []
+
+            while True:
+                res = (
+                    self.client.schema("public")
+                    .table(table_name)
+                    .select("*")
+                    .or_("content.is.null,content.eq.''") #only get records that are not processed
+                    .range(offset, offset + batch_size - 1)
+                    .execute()
+                )
+
+                if not res.data:
+                    break
+
+                all_rows.extend(res.data)
+                offset += batch_size
+            if len(all_rows) == 0:
+                self.logger.warning(f"No feed entries found in table {table_name}")
+                return []
+
+            self.logger.info(f"Fetched {len(all_rows)} feed entries from {table_name}")
+            return all_rows
+
+        except Exception as e:
+            error_msg = str(e)
+            if (
+                "relation" in error_msg.lower()
+                and "does not exist" in error_msg.lower()
+            ):
+                raise DatabaseError(f"Table feed_entries_{date} not available")
+            else:
+                self.logger.error(f"Failed to fetch feed entries for date {date}: {e}")
+                raise DatabaseError(
+                    f"Failed to fetch feed entries for date {date}: {e}"
+                )
 
     async def fetch_feed_entries_by_flashpoint_id(
         self, date: str, flashpoint_id: str

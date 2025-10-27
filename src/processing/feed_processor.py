@@ -127,7 +127,7 @@ class FeedProcessor:
             logger.info(f"Processing feed entries for date: {self.date}")
 
             # Load feed entries
-            feed_entries = await self._load_feed_entries()
+            feed_entries = await self._load_unprocessed_feed_entries()
             self.all_feed_entries[self.date] = feed_entries
 
             if not feed_entries:
@@ -433,6 +433,10 @@ class FeedProcessor:
     async def _load_feed_entries(self) -> List[Dict[str, Any]]:
         """Load feed entries for a specific date."""
         return await db_connection.fetch_feed_entries(self.date)
+    
+    async def _load_unprocessed_feed_entries(self) -> List[Dict[str, Any]]:
+        """Load feed entries for a specific date."""
+        return await db_connection.fetch_unprocessed_feed_entries(self.date)
 
     async def _load_feed_entries_by_flashpoint_id(
         self, flashpoint_id: str
