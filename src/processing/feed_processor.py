@@ -482,20 +482,21 @@ class FeedProcessor:
                 if result["status"] == "completed":
                     # Save processed article to database
                     enriched_data: FeedModel = result["enriched_data"]
-                    save_success = await db_connection.update_processed_article(
-                        enriched_data, self.date
-                    )
+                    successful += 1
+                    # save_success = await db_connection.update_processed_article(
+                    #     enriched_data, self.date
+                    # )
 
-                    if save_success:
-                        successful += 1
-                        logger.debug(
-                            f"Successfully processed and saved article: {feed_entry.get('url')}"
-                        )
-                    else:
-                        failed += 1
-                        logger.warning(
-                            f"Failed to save processed article: {feed_entry.get('url')}"
-                        )
+                    # if save_success:
+                    #     successful += 1
+                    #     logger.debug(
+                    #         f"Successfully processed and saved article: {feed_entry.get('url')}"
+                    #     )
+                    # else:
+                    #     failed += 1
+                    #     logger.warning(
+                    #         f"Failed to save processed article: {feed_entry.get('url')}"
+                    #     )
                 else:
                     failed += 1
                     logger.warning(
@@ -564,37 +565,37 @@ class FeedProcessor:
             if data_results["status"] == "completed":
                 results = data_results["results"]
 
-                # Process results and save to database
-                for i, result in enumerate(results):
-                    try:
-                        if result["status"] == "completed":
-                            # Save processed article to database
-                            enriched_data: FeedModel = result["enriched_data"]
-                            save_success = await db_connection.update_processed_article(
-                                enriched_data, self.date
-                            )
+                # # Process results and save to database
+                # for i, result in enumerate(results):
+                #     try:
+                #         if result["status"] == "completed":
+                #             # Save processed article to database
+                #             enriched_data: FeedModel = result["enriched_data"]
+                #             save_success = await db_connection.update_processed_article(
+                #                 enriched_data, self.date
+                #             )
 
-                            if save_success:
-                                successful += 1
-                                logger.debug(
-                                    f"Successfully processed and saved article: {enriched_data.url}"
-                                )
-                            else:
-                                failed += 1
-                                logger.warning(
-                                    f"Failed to save processed article: {enriched_data.url}"
-                                )
-                        else:
-                            failed += 1
-                            logger.warning(
-                                f"Failed to process article: {article_data_list[i].url} - {result.get('errors', [])}"
-                            )
+                #             if save_success:
+                #                 successful += 1
+                #                 logger.debug(
+                #                     f"Successfully processed and saved article: {enriched_data.url}"
+                #                 )
+                #             else:
+                #                 failed += 1
+                #                 logger.warning(
+                #                     f"Failed to save processed article: {enriched_data.url}"
+                #                 )
+                #         else:
+                #             failed += 1
+                #             logger.warning(
+                #                 f"Failed to process article: {article_data_list[i].url} - {result.get('errors', [])}"
+                #             )
 
-                    except Exception as e:
-                        failed += 1
-                        logger.error(
-                            f"Error saving processed article {article_data_list[i].url}: {e}"
-                        )
+                #     except Exception as e:
+                #         failed += 1
+                #         logger.error(
+                #             f"Error saving processed article {article_data_list[i].url}: {e}"
+                #         )
             else:
                 # If batch processing failed, mark all as failed
                 failed = len(article_data_list)

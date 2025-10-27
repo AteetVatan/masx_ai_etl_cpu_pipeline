@@ -174,7 +174,9 @@ class PipelineManager:
             # Calculate processing time
             processing_time = time.time() - start_time
 
-            # Statistics removed to avoid race conditions in parallel execution
+            # Store the article data in the database
+            await db_connection.update_processed_article(article_data, date)
+            logger.info(f"Successfully stored article {article_id} in the database")            
 
             result = {
                 "article_id": article_id,
